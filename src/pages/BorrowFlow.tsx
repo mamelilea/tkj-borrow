@@ -8,12 +8,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, ArrowRight, QrCode, FileText, Camera, CheckCircle, AlertCircle } from "lucide-react";
-import { mockItems } from "@/lib/mockData";
+import {
+  ArrowLeft,
+  ArrowRight,
+  QrCode,
+  FileText,
+  Camera,
+  CheckCircle,
+  AlertCircle,
+} from "lucide-react";
 import { Item, BorrowingFormData } from "@/types";
 import { generateBorrowingCode } from "@/lib/qrUtils";
 import { toast } from "react-hot-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { barangAPI, peminjamanAPI } from "@/lib/api";
 
 type Step = "scan" | "form" | "photo" | "summary";
 
@@ -21,7 +29,9 @@ const BorrowFlow = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<Step>("scan");
-  const [selectedItem, setSelectedItem] = useState<Item | null>(location.state?.selectedItem || null);
+  const [selectedItem, setSelectedItem] = useState<Item | null>(
+    location.state?.selectedItem || null
+  );
   const [scanMode, setScanMode] = useState<"qr" | "manual">("qr");
   const [formData, setFormData] = useState<BorrowingFormData>({
     nama_peminjam: "",
@@ -37,29 +47,36 @@ const BorrowFlow = () => {
   useEffect(() => {
     if (selectedItem) {
       setCurrentStep("form");
-      setFormData(prev => ({ ...prev, id_barang: selectedItem.id }));
+      setFormData((prev) => ({ ...prev, id_barang: selectedItem.id }));
     }
   }, [selectedItem]);
 
-  const handleQRScan = (decodedText: string) => {
-    const item = mockItems.find(i => i.kode_barang === decodedText);
-    if (item) {
-      const available = item.jumlah_stok - item.jumlah_dipinjam;
-      if (available > 0) {
-        setSelectedItem(item);
-        setFormData(prev => ({ ...prev, id_barang: item.id }));
-        setCurrentStep("form");
-        toast.success(`Barang ditemukan: ${item.nama_barang}`);
+  const handleQRScan = async (decodedText: string) => {
+    try {
+      const item = await barangAPI.getByKode(decodedText);
+      if (item) {
+        const available = item.jumlah_stok - item.jumlah_dipinjam;
+        if (available > 0) {
+          setSelectedItem(item);
+          setFormData((prev) => ({ ...prev, id_barang: item.id }));
+          setCurrentStep("form");
+          toast.success(`Barang ditemukan: ${item.nama_barang}`);
+        } else {
+          toast.error("Maaf, barang tidak tersedia saat ini");
+        }
       } else {
-        toast.error("Maaf, barang tidak tersedia saat ini");
+        toast.error("QR Code tidak valid atau barang tidak ditemukan");
       }
-    } else {
-      toast.error("QR Code tidak valid atau barang tidak ditemukan");
+    } catch (error) {
+      console.error("Error fetching item:", error);
+      toast.error("Gagal memuat data barang");
     }
   };
 
   const handleManualCode = () => {
-    const kodeBarang = (document.getElementById("manual-code") as HTMLInputElement)?.value;
+    const kodeBarang = (
+      document.getElementById("manual-code") as HTMLInputElement
+    )?.value;
     if (kodeBarang) {
       handleQRScan(kodeBarang);
     } else {
@@ -69,8 +86,13 @@ const BorrowFlow = () => {
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.nama_peminjam || !formData.kontak || !formData.keperluan || !formData.guru_pendamping) {
+
+    if (
+      !formData.nama_peminjam ||
+      !formData.kontak ||
+      !formData.keperluan ||
+      !formData.guru_pendamping
+    ) {
       toast.error("Mohon lengkapi semua field");
       return;
     }
@@ -97,12 +119,47 @@ const BorrowFlow = () => {
     toast.success("Foto berhasil diambil!");
   };
 
-  const handleComplete = () => {
-    // In real app, this would save to database
-    toast.success("Peminjaman berhasil! Barang telah dipinjam.");
-    setTimeout(() => {
-      navigate("/");
-    }, 2000);
+  const handleComplete = async () => {
+    if (!selectedItem || !borrowingCode) {
+      toast.error("Data tidak lengkap");
+      return;
+    }
+
+    // Validate form data
+    if (
+      !formData.nama_peminjam ||
+      !formData.keperluan ||
+      !formData.guru_pendamping ||
+      !formData.jumlah
+    ) {
+      toast.error("Mohon lengkapi semua field yang wajib diisi");
+      return;
+    }
+
+    // Ensure all required fields are present
+    const borrowingData = {
+      id_barang: Number(selectedItem.id),
+      nama_peminjam: formData.nama_peminjam.trim(),
+      kontak: formData.kontak?.trim() || null,
+      keperluan: formData.keperluan.trim(),
+      guru_pendamping: formData.guru_pendamping.trim(),
+      jumlah: Number(formData.jumlah),
+      foto_credential: photoData || null,
+    };
+
+    try {
+      console.log("Sending borrowing data:", borrowingData);
+      const result = await peminjamanAPI.create(borrowingData);
+      console.log("Response:", result);
+
+      toast.success(`Peminjaman berhasil! Kode: ${borrowingCode}`);
+      setTimeout(() => {
+        navigate("/");
+      }, 2000);
+    } catch (error) {
+      console.error("Error creating borrowing:", error);
+      toast.error("Gagal menyimpan data peminjaman");
+    }
   };
 
   const renderStepIndicator = () => {
@@ -113,7 +170,7 @@ const BorrowFlow = () => {
       { id: "summary", label: "Selesai", icon: CheckCircle },
     ];
 
-    const currentIndex = steps.findIndex(s => s.id === currentStep);
+    const currentIndex = steps.findIndex((s) => s.id === currentStep);
 
     return (
       <div className="flex items-center justify-center mb-8 gap-2">
@@ -124,16 +181,26 @@ const BorrowFlow = () => {
 
           return (
             <div key={step.id} className="flex items-center">
-              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                isActive ? "bg-primary text-primary-foreground shadow-md" :
-                isCompleted ? "bg-success text-success-foreground" :
-                "bg-muted text-muted-foreground"
-              }`}>
+              <div
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                  isActive
+                    ? "bg-primary text-primary-foreground shadow-md"
+                    : isCompleted
+                    ? "bg-success text-success-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
                 <Icon className="h-4 w-4" />
-                <span className="text-sm font-medium hidden sm:inline">{step.label}</span>
+                <span className="text-sm font-medium hidden sm:inline">
+                  {step.label}
+                </span>
               </div>
               {index < steps.length - 1 && (
-                <ArrowRight className={`h-4 w-4 mx-1 ${isCompleted ? "text-success" : "text-muted-foreground"}`} />
+                <ArrowRight
+                  className={`h-4 w-4 mx-1 ${
+                    isCompleted ? "text-success" : "text-muted-foreground"
+                  }`}
+                />
               )}
             </div>
           );
@@ -145,11 +212,7 @@ const BorrowFlow = () => {
   return (
     <PublicLayout>
       <div className="max-w-4xl mx-auto">
-        <Button
-          variant="ghost"
-          onClick={() => navigate("/")}
-          className="mb-6"
-        >
+        <Button variant="ghost" onClick={() => navigate("/")} className="mb-6">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Kembali ke Beranda
         </Button>
@@ -178,7 +241,9 @@ const BorrowFlow = () => {
                     <div className="text-center">
                       <QrCode className="h-8 w-8 mx-auto mb-2" />
                       <div className="font-semibold">Scan QR Code</div>
-                      <div className="text-xs text-muted-foreground mt-1">Metode tercepat</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Metode tercepat
+                      </div>
                     </div>
                   </Button>
                   <Button
@@ -189,7 +254,9 @@ const BorrowFlow = () => {
                     <div className="text-center">
                       <FileText className="h-8 w-8 mx-auto mb-2" />
                       <div className="font-semibold">Input Manual</div>
-                      <div className="text-xs text-muted-foreground mt-1">Jika scan tidak bisa</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Jika scan tidak bisa
+                      </div>
                     </div>
                   </Button>
                 </div>
@@ -246,10 +313,16 @@ const BorrowFlow = () => {
                       />
                     )}
                     <div>
-                      <p className="font-semibold">{selectedItem.nama_barang}</p>
-                      <p className="text-sm text-muted-foreground">Kode: {selectedItem.kode_barang}</p>
+                      <p className="font-semibold">
+                        {selectedItem.nama_barang}
+                      </p>
                       <p className="text-sm text-muted-foreground">
-                        Tersedia: {selectedItem.jumlah_stok - selectedItem.jumlah_dipinjam}
+                        Kode: {selectedItem.kode_barang}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Tersedia:{" "}
+                        {selectedItem.jumlah_stok -
+                          selectedItem.jumlah_dipinjam}
                       </p>
                     </div>
                   </div>
@@ -261,7 +334,12 @@ const BorrowFlow = () => {
                     <Input
                       id="nama"
                       value={formData.nama_peminjam}
-                      onChange={(e) => setFormData({ ...formData, nama_peminjam: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          nama_peminjam: e.target.value,
+                        })
+                      }
                       required
                     />
                   </div>
@@ -271,7 +349,9 @@ const BorrowFlow = () => {
                       id="kontak"
                       type="tel"
                       value={formData.kontak}
-                      onChange={(e) => setFormData({ ...formData, kontak: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, kontak: e.target.value })
+                      }
                       placeholder="08xxxxxxxxxx"
                       required
                     />
@@ -283,7 +363,9 @@ const BorrowFlow = () => {
                   <Textarea
                     id="keperluan"
                     value={formData.keperluan}
-                    onChange={(e) => setFormData({ ...formData, keperluan: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, keperluan: e.target.value })
+                    }
                     placeholder="Contoh: Praktikum Jaringan Komputer"
                     required
                   />
@@ -295,7 +377,12 @@ const BorrowFlow = () => {
                     <Input
                       id="guru"
                       value={formData.guru_pendamping}
-                      onChange={(e) => setFormData({ ...formData, guru_pendamping: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          guru_pendamping: e.target.value,
+                        })
+                      }
                       placeholder="Contoh: Pak Budi"
                       required
                     />
@@ -306,9 +393,16 @@ const BorrowFlow = () => {
                       id="jumlah"
                       type="number"
                       min="1"
-                      max={selectedItem.jumlah_stok - selectedItem.jumlah_dipinjam}
+                      max={
+                        selectedItem.jumlah_stok - selectedItem.jumlah_dipinjam
+                      }
                       value={formData.jumlah}
-                      onChange={(e) => setFormData({ ...formData, jumlah: parseInt(e.target.value) })}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          jumlah: parseInt(e.target.value),
+                        })
+                      }
                       required
                     />
                   </div>
@@ -339,7 +433,8 @@ const BorrowFlow = () => {
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                Ambil foto yang jelas menampilkan wajah peminjam dan barang yang dipinjam
+                Ambil foto yang jelas menampilkan wajah peminjam dan barang yang
+                dipinjam
               </AlertDescription>
             </Alert>
             <CameraCapture
@@ -365,7 +460,9 @@ const BorrowFlow = () => {
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-success/10 text-success rounded-full mb-4">
                   <CheckCircle className="h-8 w-8" />
                 </div>
-                <CardTitle className="text-2xl mb-2">Peminjaman Berhasil!</CardTitle>
+                <CardTitle className="text-2xl mb-2">
+                  Peminjaman Berhasil!
+                </CardTitle>
                 <p className="text-muted-foreground">
                   Simpan kode peminjaman di bawah untuk proses pengembalian
                 </p>
@@ -374,12 +471,20 @@ const BorrowFlow = () => {
             <CardContent className="space-y-6">
               {/* Borrowing Code */}
               <div className="bg-primary/5 border-2 border-primary rounded-lg p-6 text-center">
-                <p className="text-sm text-muted-foreground mb-2">Kode Peminjaman</p>
-                <p className="text-3xl font-bold text-primary mb-4">{borrowingCode}</p>
-                <Alert variant="default" className="bg-warning/10 border-warning">
+                <p className="text-sm text-muted-foreground mb-2">
+                  Kode Peminjaman
+                </p>
+                <p className="text-3xl font-bold text-primary mb-4">
+                  {borrowingCode}
+                </p>
+                <Alert
+                  variant="default"
+                  className="bg-warning/10 border-warning"
+                >
                   <AlertCircle className="h-4 w-4 text-warning" />
-                  <AlertDescription className="text-warning-foreground">
-                    <strong>PENTING!</strong> Catat atau foto kode ini. Kode diperlukan saat pengembalian barang.
+                  <AlertDescription className="text-warning-foreground text-black">
+                    <strong>PENTING!</strong> Catat atau foto kode ini. Kode
+                    diperlukan saat pengembalian barang.
                   </AlertDescription>
                 </Alert>
               </div>
@@ -390,7 +495,9 @@ const BorrowFlow = () => {
                 <div className="grid gap-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Barang:</span>
-                    <span className="font-medium">{selectedItem.nama_barang}</span>
+                    <span className="font-medium">
+                      {selectedItem.nama_barang}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Jumlah:</span>
@@ -398,7 +505,9 @@ const BorrowFlow = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Peminjam:</span>
-                    <span className="font-medium">{formData.nama_peminjam}</span>
+                    <span className="font-medium">
+                      {formData.nama_peminjam}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Kontak:</span>
@@ -409,8 +518,12 @@ const BorrowFlow = () => {
                     <span className="font-medium">{formData.keperluan}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Guru Pendamping:</span>
-                    <span className="font-medium">{formData.guru_pendamping}</span>
+                    <span className="text-muted-foreground">
+                      Guru Pendamping:
+                    </span>
+                    <span className="font-medium">
+                      {formData.guru_pendamping}
+                    </span>
                   </div>
                 </div>
               </div>

@@ -7,10 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, CheckCircle, AlertCircle, Search } from "lucide-react";
-import { mockBorrowings } from "@/lib/mockData";
 import { Borrowing } from "@/types";
 import { toast } from "react-hot-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { peminjamanAPI } from "@/lib/api";
 
 type Step = "search" | "verify" | "complete";
 
@@ -21,22 +21,25 @@ const ReturnFlow = () => {
   const [foundBorrowing, setFoundBorrowing] = useState<Borrowing | null>(null);
   const [verificationPhoto, setVerificationPhoto] = useState("");
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!borrowingCode.trim()) {
       toast.error("Masukkan kode peminjaman");
       return;
     }
 
-    const borrowing = mockBorrowings.find(
-      b => b.kode_peminjaman === borrowingCode && b.status === 'Dipinjam'
-    );
+    try {
+      const borrowing = await peminjamanAPI.getByKode(borrowingCode);
 
-    if (borrowing) {
-      setFoundBorrowing(borrowing);
-      setCurrentStep("verify");
-      toast.success("Data peminjaman ditemukan!");
-    } else {
-      toast.error("Kode peminjaman tidak ditemukan atau sudah dikembalikan");
+      if (borrowing && borrowing.status === "Dipinjam") {
+        setFoundBorrowing(borrowing);
+        setCurrentStep("verify");
+        toast.success("Data peminjaman ditemukan!");
+      } else {
+        toast.error("Kode peminjaman tidak ditemukan atau sudah dikembalikan");
+      }
+    } catch (error) {
+      console.error("Error fetching borrowing:", error);
+      toast.error("Gagal memuat data peminjaman");
     }
   };
 
@@ -49,22 +52,31 @@ const ReturnFlow = () => {
     }, 500);
   };
 
-  const handleComplete = () => {
-    // In real app, this would update database
-    toast.success("Pengembalian berhasil! Terima kasih.");
-    setTimeout(() => {
-      navigate("/");
-    }, 2000);
+  const handleComplete = async () => {
+    if (!foundBorrowing) {
+      toast.error("Data tidak lengkap");
+      return;
+    }
+
+    try {
+      await peminjamanAPI.return(
+        foundBorrowing.kode_peminjaman,
+        verificationPhoto
+      );
+      toast.success("Pengembalian berhasil! Terima kasih.");
+      setTimeout(() => {
+        navigate("/");
+      }, 2000);
+    } catch (error) {
+      console.error("Error returning item:", error);
+      toast.error("Gagal menyimpan data pengembalian");
+    }
   };
 
   return (
     <PublicLayout>
       <div className="max-w-2xl mx-auto">
-        <Button
-          variant="ghost"
-          onClick={() => navigate("/")}
-          className="mb-6"
-        >
+        <Button variant="ghost" onClick={() => navigate("/")} className="mb-6">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Kembali ke Beranda
         </Button>
@@ -90,8 +102,10 @@ const ReturnFlow = () => {
                   id="code"
                   placeholder="Contoh: PMJ-2025-001"
                   value={borrowingCode}
-                  onChange={(e) => setBorrowingCode(e.target.value.toUpperCase())}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  onChange={(e) =>
+                    setBorrowingCode(e.target.value.toUpperCase())
+                  }
+                  onKeyPress={(e) => e.key === "Enter" && handleSearch()}
                   className="text-lg font-mono"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
@@ -107,7 +121,8 @@ const ReturnFlow = () => {
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription className="text-xs">
-                  Pastikan Anda memasukkan kode peminjaman yang benar. Kode ini diberikan saat Anda meminjam barang.
+                  Pastikan Anda memasukkan kode peminjaman yang benar. Kode ini
+                  diberikan saat Anda meminjam barang.
                 </AlertDescription>
               </Alert>
             </CardContent>
@@ -126,24 +141,36 @@ const ReturnFlow = () => {
                   <div className="grid gap-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Kode:</span>
-                      <span className="font-mono font-semibold">{foundBorrowing.kode_peminjaman}</span>
+                      <span className="font-mono font-semibold">
+                        {foundBorrowing.kode_peminjaman}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Barang:</span>
-                      <span className="font-medium">{foundBorrowing.nama_barang}</span>
+                      <span className="font-medium">
+                        {foundBorrowing.nama_barang}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Jumlah:</span>
-                      <span className="font-medium">{foundBorrowing.jumlah}</span>
+                      <span className="font-medium">
+                        {foundBorrowing.jumlah}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Peminjam:</span>
-                      <span className="font-medium">{foundBorrowing.nama_peminjam}</span>
+                      <span className="font-medium">
+                        {foundBorrowing.nama_peminjam}
+                      </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Tanggal Pinjam:</span>
+                      <span className="text-muted-foreground">
+                        Tanggal Pinjam:
+                      </span>
                       <span className="font-medium">
-                        {new Date(foundBorrowing.tanggal_pinjam).toLocaleDateString('id-ID')}
+                        {new Date(
+                          foundBorrowing.tanggal_pinjam
+                        ).toLocaleDateString("id-ID")}
                       </span>
                     </div>
                   </div>
@@ -151,7 +178,9 @@ const ReturnFlow = () => {
 
                 {foundBorrowing.foto_credential && (
                   <div>
-                    <p className="text-sm text-muted-foreground mb-2">Foto saat peminjaman:</p>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Foto saat peminjaman:
+                    </p>
                     <img
                       src={foundBorrowing.foto_credential}
                       alt="Foto peminjaman"
@@ -165,7 +194,8 @@ const ReturnFlow = () => {
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                Ambil foto untuk verifikasi pengembalian. Pastikan wajah dan barang terlihat jelas.
+                Ambil foto untuk verifikasi pengembalian. Pastikan wajah dan
+                barang terlihat jelas.
               </AlertDescription>
             </Alert>
 
@@ -193,7 +223,9 @@ const ReturnFlow = () => {
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-success/10 text-success rounded-full mb-4">
                   <CheckCircle className="h-8 w-8" />
                 </div>
-                <CardTitle className="text-2xl mb-2">Pengembalian Berhasil!</CardTitle>
+                <CardTitle className="text-2xl mb-2">
+                  Pengembalian Berhasil!
+                </CardTitle>
                 <p className="text-muted-foreground">
                   Barang telah dikembalikan. Terima kasih!
                 </p>
@@ -203,27 +235,39 @@ const ReturnFlow = () => {
               <div className="bg-success/5 border border-success rounded-lg p-4">
                 <div className="grid gap-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Kode Peminjaman:</span>
-                    <span className="font-mono font-semibold">{foundBorrowing.kode_peminjaman}</span>
+                    <span className="text-muted-foreground">
+                      Kode Peminjaman:
+                    </span>
+                    <span className="font-mono font-semibold">
+                      {foundBorrowing.kode_peminjaman}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Barang:</span>
-                    <span className="font-medium">{foundBorrowing.nama_barang}</span>
+                    <span className="font-medium">
+                      {foundBorrowing.nama_barang}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Jumlah:</span>
                     <span className="font-medium">{foundBorrowing.jumlah}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tanggal Kembali:</span>
-                    <span className="font-medium">{new Date().toLocaleDateString('id-ID')}</span>
+                    <span className="text-muted-foreground">
+                      Tanggal Kembali:
+                    </span>
+                    <span className="font-medium">
+                      {new Date().toLocaleDateString("id-ID")}
+                    </span>
                   </div>
                 </div>
               </div>
 
               {verificationPhoto && (
                 <div>
-                  <p className="text-sm text-muted-foreground mb-2">Foto verifikasi:</p>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Foto verifikasi:
+                  </p>
                   <img
                     src={verificationPhoto}
                     alt="Verifikasi"
@@ -235,7 +279,8 @@ const ReturnFlow = () => {
               <Alert className="bg-success/10 border-success">
                 <CheckCircle className="h-4 w-4 text-success" />
                 <AlertDescription className="text-success-foreground">
-                  Status barang telah diperbarui. Barang kembali tersedia untuk dipinjam.
+                  Status barang telah diperbarui. Barang kembali tersedia untuk
+                  dipinjam.
                 </AlertDescription>
               </Alert>
 

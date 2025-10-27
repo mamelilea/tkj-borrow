@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AdminLayout from "@/layouts/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,15 +21,27 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2, Download, QrCode, Search, Package } from "lucide-react";
-import { mockItems } from "@/lib/mockData";
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Download,
+  QrCode,
+  Search,
+  Package,
+} from "lucide-react";
 import { Item } from "@/types";
-import { generateQRCode, downloadQRCode, generateItemCode } from "@/lib/qrUtils";
+import {
+  generateQRCode,
+  downloadQRCode,
+  generateItemCode,
+} from "@/lib/qrUtils";
 import { toast } from "react-hot-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { barangAPI } from "@/lib/api";
 
 const Items = () => {
-  const [items, setItems] = useState<Item[]>(mockItems);
+  const [items, setItems] = useState<Item[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -37,6 +49,24 @@ const Items = () => {
   const [qrCodeData, setQrCodeData] = useState<string>("");
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
   const [currentQrCode, setCurrentQrCode] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchItems = async () => {
+      try {
+        setLoading(true);
+        const data = await barangAPI.getAll();
+        setItems(data);
+      } catch (error) {
+        console.error("Error fetching items:", error);
+        toast.error("Gagal memuat data barang");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchItems();
+  }, []);
 
   const filteredItems = items.filter(
     (item) =>
@@ -47,57 +77,72 @@ const Items = () => {
   const handleAddItem = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    
+
     const lastCode = items[items.length - 1]?.kode_barang;
     const newCode = generateItemCode(lastCode);
 
-    const newItem: Item = {
-      id: items.length + 1,
-      kode_barang: newCode,
-      nama_barang: formData.get("nama") as string,
-      jumlah_stok: parseInt(formData.get("stok") as string),
-      jumlah_dipinjam: 0,
-      foto_barang: formData.get("foto") as string,
-      notes: formData.get("notes") as string,
-      created_at: new Date().toISOString(),
-    };
+    try {
+      const newItem = await barangAPI.create({
+        kode_barang: newCode,
+        nama_barang: formData.get("nama") as string,
+        jumlah_stok: parseInt(formData.get("stok") as string),
+        jumlah_dipinjam: 0,
+        foto_barang: (formData.get("foto") as string) || undefined,
+        notes: (formData.get("notes") as string) || undefined,
+      });
 
-    setItems([...items, newItem]);
-    setIsAddDialogOpen(false);
+      setItems([...items, newItem]);
+      setIsAddDialogOpen(false);
 
-    // Generate and show QR Code
-    const qrData = await generateQRCode(newCode);
-    setQrCodeData(qrData);
-    setCurrentQrCode(newCode);
-    setQrDialogOpen(true);
+      // Generate and show QR Code
+      const qrData = await generateQRCode(newCode);
+      setQrCodeData(qrData);
+      setCurrentQrCode(newCode);
+      setQrDialogOpen(true);
 
-    toast.success("Barang berhasil ditambahkan!");
+      toast.success("Barang berhasil ditambahkan!");
+    } catch (error) {
+      console.error("Error creating item:", error);
+      toast.error("Gagal menambahkan barang");
+    }
   };
 
-  const handleEditItem = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleEditItem = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingItem) return;
 
     const formData = new FormData(e.currentTarget);
-    
-    const updatedItem: Item = {
-      ...editingItem,
-      nama_barang: formData.get("nama") as string,
-      jumlah_stok: parseInt(formData.get("stok") as string),
-      foto_barang: formData.get("foto") as string,
-      notes: formData.get("notes") as string,
-    };
 
-    setItems(items.map(item => item.id === updatedItem.id ? updatedItem : item));
-    setIsEditDialogOpen(false);
-    setEditingItem(null);
-    toast.success("Barang berhasil diupdate!");
+    try {
+      await barangAPI.update(editingItem.id, {
+        nama_barang: formData.get("nama") as string,
+        jumlah_stok: parseInt(formData.get("stok") as string),
+        foto_barang: (formData.get("foto") as string) || undefined,
+        notes: (formData.get("notes") as string) || undefined,
+      });
+
+      // Refresh items from server
+      const updatedItems = await barangAPI.getAll();
+      setItems(updatedItems);
+      setIsEditDialogOpen(false);
+      setEditingItem(null);
+      toast.success("Barang berhasil diupdate!");
+    } catch (error) {
+      console.error("Error updating item:", error);
+      toast.error("Gagal mengupdate barang");
+    }
   };
 
-  const handleDeleteItem = (id: number) => {
+  const handleDeleteItem = async (id: number) => {
     if (confirm("Apakah Anda yakin ingin menghapus barang ini?")) {
-      setItems(items.filter(item => item.id !== id));
-      toast.success("Barang berhasil dihapus!");
+      try {
+        await barangAPI.delete(id);
+        setItems(items.filter((item) => item.id !== id));
+        toast.success("Barang berhasil dihapus!");
+      } catch (error) {
+        console.error("Error deleting item:", error);
+        toast.error("Gagal menghapus barang");
+      }
     }
   };
 
@@ -168,7 +213,8 @@ const Items = () => {
                 </div>
                 <Alert>
                   <AlertDescription className="text-xs">
-                    Kode barang dan QR Code akan dibuat otomatis setelah barang ditambahkan
+                    Kode barang dan QR Code akan dibuat otomatis setelah barang
+                    ditambahkan
                   </AlertDescription>
                 </Alert>
                 <Button type="submit" className="w-full">
@@ -233,7 +279,9 @@ const Items = () => {
                             </div>
                           )}
                         </TableCell>
-                        <TableCell className="font-medium">{item.nama_barang}</TableCell>
+                        <TableCell className="font-medium">
+                          {item.nama_barang}
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <code className="text-xs bg-muted px-2 py-1 rounded">
@@ -252,12 +300,18 @@ const Items = () => {
                         <TableCell>
                           <div className="text-sm">
                             <div>Total: {item.jumlah_stok}</div>
-                            <div className="text-success">Tersedia: {available}</div>
-                            <div className="text-warning">Dipinjam: {item.jumlah_dipinjam}</div>
+                            <div className="text-success">
+                              Tersedia: {available}
+                            </div>
+                            <div className="text-warning">
+                              Dipinjam: {item.jumlah_dipinjam}
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={available > 0 ? "default" : "secondary"}>
+                          <Badge
+                            variant={available > 0 ? "default" : "secondary"}
+                          >
                             {available > 0 ? "Tersedia" : "Habis"}
                           </Badge>
                         </TableCell>
@@ -383,7 +437,11 @@ const Items = () => {
                 </div>
               )}
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setQrDialogOpen(false)} className="flex-1">
+                <Button
+                  variant="outline"
+                  onClick={() => setQrDialogOpen(false)}
+                  className="flex-1"
+                >
                   Tutup
                 </Button>
                 <Button onClick={handleDownloadQR} className="flex-1">

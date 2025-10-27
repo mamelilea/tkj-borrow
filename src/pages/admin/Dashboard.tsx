@@ -1,17 +1,60 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import AdminLayout from "@/layouts/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Package, ClipboardList, TrendingUp, Users, ArrowRight } from "lucide-react";
-import { mockItems, mockBorrowings } from "@/lib/mockData";
+import {
+  Package,
+  ClipboardList,
+  TrendingUp,
+  Users,
+  ArrowRight,
+} from "lucide-react";
+import { peminjamanAPI, barangAPI } from "@/lib/api";
+import { Borrowing } from "@/types";
+import { toast } from "react-hot-toast";
 
 const Dashboard = () => {
-  const totalItems = mockItems.length;
-  const totalStock = mockItems.reduce((sum, item) => sum + item.jumlah_stok, 0);
-  const totalBorrowed = mockItems.reduce((sum, item) => sum + item.jumlah_dipinjam, 0);
-  const totalAvailable = totalStock - totalBorrowed;
-  const activeBorrowings = mockBorrowings.filter(b => b.status === 'Dipinjam').length;
-  const completedBorrowings = mockBorrowings.filter(b => b.status === 'Dikembalikan').length;
+  const [statistics, setStatistics] = useState({
+    total_barang: 0,
+    total_stok: 0,
+    total_tersedia: 0,
+    total_dipinjam: 0,
+    active_peminjaman: 0,
+    completed_peminjaman: 0,
+  });
+  const [borrowings, setBorrowings] = useState<Borrowing[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [stats, borrowingsData] = await Promise.all([
+          peminjamanAPI.getStatistics(),
+          peminjamanAPI.getAll(),
+        ]);
+
+        setStatistics(stats);
+        setBorrowings(borrowingsData);
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+        toast.error("Gagal memuat data dashboard");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const {
+    total_barang: totalItems,
+    total_stok: totalStock,
+    total_tersedia: totalAvailable,
+    total_dipinjam: totalBorrowed,
+    active_peminjaman: activeBorrowings,
+    completed_peminjaman: completedBorrowings,
+  } = statistics;
 
   return (
     <AdminLayout>
@@ -93,7 +136,8 @@ const Dashboard = () => {
               <Package className="h-12 w-12 text-primary mb-4" />
               <CardTitle className="text-2xl mb-2">Kelola Barang</CardTitle>
               <p className="text-muted-foreground mb-4">
-                Tambah, edit, atau hapus data barang. Generate QR code otomatis untuk setiap barang.
+                Tambah, edit, atau hapus data barang. Generate QR code otomatis
+                untuk setiap barang.
               </p>
               <Button asChild size="lg" className="shadow-md">
                 <Link to="/tkj-mgmt-2025/items">
@@ -109,7 +153,8 @@ const Dashboard = () => {
               <ClipboardList className="h-12 w-12 text-success mb-4" />
               <CardTitle className="text-2xl mb-2">Kelola Peminjaman</CardTitle>
               <p className="text-muted-foreground mb-4">
-                Lihat histori peminjaman, edit status, dan export data untuk laporan.
+                Lihat histori peminjaman, edit status, dan export data untuk
+                laporan.
               </p>
               <Button asChild size="lg" className="shadow-md">
                 <Link to="/tkj-mgmt-2025/borrowings">
@@ -136,7 +181,7 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {mockBorrowings.slice(0, 5).map((borrowing) => (
+              {(loading ? [] : borrowings.slice(0, 5)).map((borrowing) => (
                 <div
                   key={borrowing.id}
                   className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
@@ -157,10 +202,16 @@ const Dashboard = () => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-mono font-medium">{borrowing.kode_peminjaman}</p>
-                    <p className={`text-xs ${
-                      borrowing.status === 'Dipinjam' ? 'text-warning' : 'text-success'
-                    }`}>
+                    <p className="text-sm font-mono font-medium">
+                      {borrowing.kode_peminjaman}
+                    </p>
+                    <p
+                      className={`text-xs ${
+                        borrowing.status === "Dipinjam"
+                          ? "text-warning"
+                          : "text-success"
+                      }`}
+                    >
                       {borrowing.status}
                     </p>
                   </div>

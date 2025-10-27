@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AdminLayout from "@/layouts/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,9 +20,9 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Search, Download, Eye, Edit, Trash2, Calendar } from "lucide-react";
-import { mockBorrowings } from "@/lib/mockData";
 import { Borrowing } from "@/types";
 import { toast } from "react-hot-toast";
+import { peminjamanAPI } from "@/lib/api";
 import {
   Dialog,
   DialogContent,
@@ -31,11 +31,29 @@ import {
 } from "@/components/ui/dialog";
 
 const Borrowings = () => {
-  const [borrowings] = useState<Borrowing[]>(mockBorrowings);
+  const [borrowings, setBorrowings] = useState<Borrowing[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedBorrowing, setSelectedBorrowing] = useState<Borrowing | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchBorrowings = async () => {
+      try {
+        setLoading(true);
+        const data = await peminjamanAPI.getAll();
+        setBorrowings(data);
+      } catch (error) {
+        console.error("Error fetching borrowings:", error);
+        toast.error("Gagal memuat data peminjaman");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBorrowings();
+  }, []);
 
   const filteredBorrowings = borrowings.filter((borrowing) => {
     const matchesSearch =
@@ -53,10 +71,16 @@ const Borrowings = () => {
     setDetailDialogOpen(true);
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
     if (confirm("Apakah Anda yakin ingin menghapus data peminjaman ini?")) {
-      toast.success("Data peminjaman berhasil dihapus!");
-      // In real app, this would delete from database
+      try {
+        await peminjamanAPI.delete(id);
+        setBorrowings(borrowings.filter(b => b.id !== id));
+        toast.success("Data peminjaman berhasil dihapus!");
+      } catch (error) {
+        console.error("Error deleting borrowing:", error);
+        toast.error("Gagal menghapus data peminjaman");
+      }
     }
   };
 

@@ -1,20 +1,41 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import PublicLayout from "@/layouts/PublicLayout";
 import ItemCard from "@/components/ItemCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowRight, Package, RotateCcw, Search } from "lucide-react";
-import { mockItems } from "@/lib/mockData";
 import { Item } from "@/types";
+import { barangAPI } from "@/lib/api";
+import { toast } from "react-hot-toast";
 
 const Home = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
+  const [items, setItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredItems = mockItems.filter((item) =>
-    item.nama_barang.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.kode_barang.toLowerCase().includes(searchQuery.toLowerCase())
+  useEffect(() => {
+    const fetchItems = async () => {
+      try {
+        setLoading(true);
+        const data = await barangAPI.getAll();
+        setItems(data);
+      } catch (error) {
+        console.error("Error fetching items:", error);
+        toast.error("Gagal memuat data barang");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchItems();
+  }, []);
+
+  const filteredItems = items.filter(
+    (item) =>
+      item.nama_barang.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.kode_barang.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleBorrowItem = (item: Item) => {
@@ -29,9 +50,10 @@ const Home = () => {
           <div className="max-w-3xl">
             <h2 className="text-3xl font-bold mb-3">Selamat Datang!</h2>
             <p className="text-lg text-muted-foreground mb-6">
-              Sistem peminjaman barang Unit TKJ. Pilih barang yang ingin dipinjam atau kembalikan barang yang sudah selesai digunakan.
+              Sistem peminjaman barang Unit TKJ. Pilih barang yang ingin
+              dipinjam atau kembalikan barang yang sudah selesai digunakan.
             </p>
-            
+
             <div className="flex flex-wrap gap-3">
               <Button size="lg" asChild className="shadow-md">
                 <Link to="/borrow">
@@ -40,7 +62,7 @@ const Home = () => {
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Link>
               </Button>
-              
+
               <Button size="lg" variant="outline" asChild className="shadow-md">
                 <Link to="/return">
                   <RotateCcw className="h-5 w-5 mr-2" />
@@ -57,7 +79,7 @@ const Home = () => {
           <div className="flex items-center justify-between">
             <h3 className="text-2xl font-bold">Daftar Barang Tersedia</h3>
             <div className="text-sm text-muted-foreground">
-              Total: {mockItems.length} barang
+              Total: {items.length} barang
             </div>
           </div>
 
@@ -73,14 +95,15 @@ const Home = () => {
         </div>
 
         {/* Items Grid */}
-        {filteredItems.length > 0 ? (
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <p className="text-muted-foreground mt-4">Memuat data...</p>
+          </div>
+        ) : filteredItems.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredItems.map((item) => (
-              <ItemCard
-                key={item.id}
-                item={item}
-                onBorrow={handleBorrowItem}
-              />
+              <ItemCard key={item.id} item={item} onBorrow={handleBorrowItem} />
             ))}
           </div>
         ) : (

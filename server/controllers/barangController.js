@@ -4,7 +4,7 @@ const db = require('../config/database');
 exports.getAllBarang = async (req, res) => {
   try {
     const [rows] = await db.query(
-      'SELECT * FROM barang ORDER BY created_at DESC'
+      'SELECT id_barang as id, kode_barang, nama_barang, jumlah_stok, jumlah_dipinjam, foto_barang, notes, created_at FROM barang ORDER BY created_at DESC'
     );
     res.json({
       success: true,
@@ -25,7 +25,7 @@ exports.getBarangById = async (req, res) => {
   try {
     const { id } = req.params;
     const [rows] = await db.query(
-      'SELECT * FROM barang WHERE id_barang = ?',
+      'SELECT id_barang as id, kode_barang, nama_barang, jumlah_stok, jumlah_dipinjam, foto_barang, notes, created_at FROM barang WHERE id_barang = ?',
       [id]
     );
     
@@ -55,7 +55,7 @@ exports.getBarangByKode = async (req, res) => {
   try {
     const { kode } = req.params;
     const [rows] = await db.query(
-      'SELECT * FROM barang WHERE kode_barang = ?',
+      'SELECT id_barang as id, kode_barang, nama_barang, jumlah_stok, jumlah_dipinjam, foto_barang, notes, created_at FROM barang WHERE kode_barang = ?',
       [kode]
     );
     
@@ -97,17 +97,16 @@ exports.createBarang = async (req, res) => {
       [kode_barang, nama_barang, jumlah_stok, foto_barang || null, notes || null]
     );
 
+    // Get the created item with id alias
+    const [newItem] = await db.query(
+      'SELECT id_barang as id, kode_barang, nama_barang, jumlah_stok, jumlah_dipinjam, foto_barang, notes, created_at FROM barang WHERE id_barang = ?',
+      [result.insertId]
+    );
+
     res.status(201).json({
       success: true,
       message: 'Barang created successfully',
-      data: {
-        id_barang: result.insertId,
-        kode_barang,
-        nama_barang,
-        jumlah_stok,
-        foto_barang,
-        notes,
-      },
+      data: newItem[0],
     });
   } catch (error) {
     console.error('Error creating barang:', error);

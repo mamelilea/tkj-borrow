@@ -93,8 +93,16 @@ export const peminjamanAPI = {
   },
 
   // Create new borrowing
-  create: async (data: BorrowingFormData & { foto_credential?: string }): Promise<{ kode_peminjaman: string }> => {
-    const result = await fetchAPI<{ kode_peminjaman: string }>("/peminjaman", {
+  create: async (data: {
+    id_barang: number;
+    nama_peminjam: string;
+    kontak?: string | null;
+    keperluan: string;
+    guru_pendamping: string;
+    jumlah: number;
+    foto_credential?: string | null;
+  }): Promise<any> => {
+    const result = await fetchAPI<any>("/peminjaman", {
       method: "POST",
       body: JSON.stringify(data),
     });

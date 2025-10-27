@@ -14,7 +14,10 @@ exports.getAllPeminjaman = async (req, res) => {
     const { status } = req.query;
     
     let query = `
-      SELECT p.*, b.nama_barang, b.kode_barang, b.foto_barang
+      SELECT p.id_peminjaman as id, p.kode_peminjaman, p.id_barang, p.nama_peminjam, p.kontak, 
+             p.keperluan, p.guru_pendamping, p.jumlah, p.foto_credential, p.tanggal_pinjam, 
+             p.tanggal_kembali, p.status, p.signature, p.created_at,
+             b.nama_barang, b.kode_barang, b.foto_barang
       FROM peminjaman p
       LEFT JOIN barang b ON p.id_barang = b.id_barang
     `;
@@ -50,7 +53,10 @@ exports.getPeminjamanByCode = async (req, res) => {
     const { kode } = req.params;
     
     const [rows] = await db.query(
-      `SELECT p.*, b.nama_barang, b.kode_barang, b.foto_barang
+      `SELECT p.id_peminjaman as id, p.kode_peminjaman, p.id_barang, p.nama_peminjam, p.kontak, 
+              p.keperluan, p.guru_pendamping, p.jumlah, p.foto_credential, p.tanggal_pinjam, 
+              p.tanggal_kembali, p.status, p.signature, p.created_at,
+              b.nama_barang, b.kode_barang, b.foto_barang
        FROM peminjaman p
        LEFT JOIN barang b ON p.id_barang = b.id_barang
        WHERE p.kode_peminjaman = ?`,
@@ -98,11 +104,19 @@ exports.createPeminjaman = async (req, res) => {
     // Validate required fields
     if (!id_barang || !nama_peminjam || !keperluan || !guru_pendamping || !jumlah) {
       await connection.rollback();
+      console.error('Missing required fields:', {
+        id_barang, nama_peminjam, keperluan, guru_pendamping, jumlah
+      });
       return res.status(400).json({
         success: false,
         message: 'Semua field harus diisi',
       });
     }
+
+    // Debug log
+    console.log('Creating peminjaman with data:', {
+      id_barang, nama_peminjam, kontak, keperluan, guru_pendamping, jumlah
+    });
 
     // Check barang availability
     const [barangRows] = await connection.query(
