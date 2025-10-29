@@ -22,9 +22,11 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="bg-primary text-primary-foreground p-2.5 rounded-lg">
-                <Package className="h-6 w-6" />
-              </div>
+              <img
+                src="/favicon-32x32.png"
+                alt="Logo"
+                className="h-10 w-10 rounded-md border border-border object-contain bg-white"
+              />
               <div>
                 <h1 className="text-xl font-bold text-foreground">
                   Admin Dashboard

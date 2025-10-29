@@ -1,5 +1,4 @@
 import { ReactNode } from "react";
-import { Package } from "lucide-react";
 
 interface PublicLayoutProps {
   children: ReactNode;
@@ -12,11 +11,15 @@ const PublicLayout = ({ children }: PublicLayoutProps) => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="bg-primary text-primary-foreground p-2.5 rounded-lg">
-                <Package className="h-6 w-6" />
-              </div>
+              <img
+                src="/favicon-32x32.png"
+                alt="Logo"
+                className="h-10 w-10 rounded-md border border-border object-contain bg-white"
+              />
               <div>
-                <h1 className="text-xl font-bold text-foreground">Peminjaman Barang</h1>
+                <h1 className="text-xl font-bold text-foreground">
+                  Peminjaman Barang
+                </h1>
                 <p className="text-sm text-muted-foreground">Unit TKJ</p>
               </div>
             </div>
