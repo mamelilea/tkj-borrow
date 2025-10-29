@@ -24,7 +24,7 @@ const PublicLayout = ({ children }: PublicLayoutProps) => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto min-h-[65vh] px-4 py-8">
         {children}
       </main>
 

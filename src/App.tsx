@@ -9,6 +9,8 @@ import ReturnFlow from "./pages/ReturnFlow";
 import Dashboard from "./pages/admin/Dashboard";
 import Items from "./pages/admin/Items";
 import Borrowings from "./pages/admin/Borrowings";
+import AdminLogin from "./pages/admin/Login";
+import RequireAuth from "@/components/RequireAuth";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -21,9 +23,9 @@ const App = () => (
         toastOptions={{
           duration: 3000,
           style: {
-            background: 'hsl(var(--card))',
-            color: 'hsl(var(--card-foreground))',
-            border: '1px solid hsl(var(--border))',
+            background: "hsl(var(--card))",
+            color: "hsl(var(--card-foreground))",
+            border: "1px solid hsl(var(--border))",
           },
         }}
       />
@@ -34,12 +36,36 @@ const App = () => (
           <Route path="/" element={<Home />} />
           <Route path="/borrow" element={<BorrowFlow />} />
           <Route path="/return" element={<ReturnFlow />} />
-          
-          {/* Admin Routes - using obscure URL */}
-          <Route path="/tkj-mgmt-2025/dashboard" element={<Dashboard />} />
-          <Route path="/tkj-mgmt-2025/items" element={<Items />} />
-          <Route path="/tkj-mgmt-2025/borrowings" element={<Borrowings />} />
-          
+
+          {/* Admin Login */}
+          <Route path="/tkj-mgmt-2025/login" element={<AdminLogin />} />
+
+          {/* Admin Routes - protected */}
+          <Route
+            path="/tkj-mgmt-2025/dashboard"
+            element={
+              <RequireAuth>
+                <Dashboard />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/tkj-mgmt-2025/items"
+            element={
+              <RequireAuth>
+                <Items />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/tkj-mgmt-2025/borrowings"
+            element={
+              <RequireAuth>
+                <Borrowings />
+              </RequireAuth>
+            }
+          />
+
           {/* Catch-all */}
           <Route path="*" element={<NotFound />} />
         </Routes>

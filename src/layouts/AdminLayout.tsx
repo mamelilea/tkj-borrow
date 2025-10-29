@@ -1,7 +1,8 @@
 import { ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Package, ClipboardList, Home, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { clearAdminToken } from "@/lib/auth";
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -9,6 +10,7 @@ interface AdminLayoutProps {
 
 const AdminLayout = ({ children }: AdminLayoutProps) => {
   const location = useLocation();
+  const navigate = useNavigate();
 
   const isActive = (path: string) => {
     return location.pathname === path;
@@ -24,17 +26,15 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                 <Package className="h-6 w-6" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-foreground">Admin Dashboard</h1>
+                <h1 className="text-xl font-bold text-foreground">
+                  Admin Dashboard
+                </h1>
                 <p className="text-sm text-muted-foreground">Unit TKJ</p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                asChild
-              >
+              <Button variant="ghost" size="sm" asChild>
                 <Link to="/">
                   <Home className="h-4 w-4 mr-2" />
                   Beranda
@@ -44,6 +44,10 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                 variant="ghost"
                 size="sm"
                 className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => {
+                  clearAdminToken();
+                  navigate("/tkj-mgmt-2025/login", { replace: true });
+                }}
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
@@ -76,7 +80,9 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
             </Link>
           </Button>
           <Button
-            variant={isActive("/tkj-mgmt-2025/borrowings") ? "default" : "ghost"}
+            variant={
+              isActive("/tkj-mgmt-2025/borrowings") ? "default" : "ghost"
+            }
             size="sm"
             asChild
           >
@@ -87,9 +93,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           </Button>
         </nav>
 
-        <main>
-          {children}
-        </main>
+        <main>{children}</main>
       </div>
     </div>
   );
