@@ -18,7 +18,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Item, BorrowingFormData } from "@/types";
-import { generateBorrowingCode } from "@/lib/qrUtils";
+// Removed client-side code generation; server is source of truth
 import { toast } from "react-hot-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { barangAPI, peminjamanAPI } from "@/lib/api";
@@ -33,6 +33,7 @@ const BorrowFlow = () => {
     location.state?.selectedItem || null
   );
   const [scanMode, setScanMode] = useState<"qr" | "manual">("qr");
+  const [cameraUnavailable, setCameraUnavailable] = useState<boolean>(false);
   const [formData, setFormData] = useState<BorrowingFormData>({
     nama_peminjam: "",
     kontak: "",
@@ -111,55 +112,41 @@ const BorrowFlow = () => {
     setCurrentStep("photo");
   };
 
-  const handlePhotoCapture = (imageData: string) => {
+  const handlePhotoCapture = async (imageData: string) => {
     setPhotoData(imageData);
-    const code = generateBorrowingCode();
-    setBorrowingCode(code);
-    setCurrentStep("summary");
-    toast.success("Foto berhasil diambil!");
-  };
-
-  const handleComplete = async () => {
-    if (!selectedItem || !borrowingCode) {
-      toast.error("Data tidak lengkap");
+    if (!selectedItem) {
+      toast.error("Barang belum dipilih");
       return;
     }
-
-    // Validate form data
-    if (
-      !formData.nama_peminjam ||
-      !formData.keperluan ||
-      !formData.guru_pendamping ||
-      !formData.jumlah
-    ) {
-      toast.error("Mohon lengkapi semua field yang wajib diisi");
-      return;
-    }
-
-    // Ensure all required fields are present
-    const borrowingData = {
-      id_barang: Number(selectedItem.id),
-      nama_peminjam: formData.nama_peminjam.trim(),
-      kontak: formData.kontak?.trim() || null,
-      keperluan: formData.keperluan.trim(),
-      guru_pendamping: formData.guru_pendamping.trim(),
-      jumlah: Number(formData.jumlah),
-      foto_credential: photoData || null,
-    };
-
     try {
-      console.log("Sending borrowing data:", borrowingData);
-      const result = await peminjamanAPI.create(borrowingData);
-      console.log("Response:", result);
-
-      toast.success(`Peminjaman berhasil! Kode: ${borrowingCode}`);
-      setTimeout(() => {
-        navigate("/");
-      }, 2000);
+      const result = await peminjamanAPI.create({
+        id_barang: Number(selectedItem.id),
+        nama_peminjam: formData.nama_peminjam.trim(),
+        kontak: formData.kontak?.trim() || null,
+        keperluan: formData.keperluan.trim(),
+        guru_pendamping: formData.guru_pendamping.trim(),
+        jumlah: Number(formData.jumlah),
+        foto_credential: imageData || null,
+      });
+      // Use server-generated code
+      setBorrowingCode(result.kode_peminjaman);
+      setCurrentStep("summary");
+      toast.success("Peminjaman berhasil dibuat!");
     } catch (error) {
       console.error("Error creating borrowing:", error);
       toast.error("Gagal menyimpan data peminjaman");
     }
+  };
+
+  const handleComplete = async () => {
+    if (!borrowingCode) {
+      toast.error("Kode peminjaman belum tersedia");
+      return;
+    }
+    toast.success(`Peminjaman berhasil! Kode: ${borrowingCode}`);
+    setTimeout(() => {
+      navigate("/");
+    }, 1500);
   };
 
   const renderStepIndicator = () => {
@@ -227,46 +214,14 @@ const BorrowFlow = () => {
         {/* Step: Scan/Select Item */}
         {currentStep === "scan" && (
           <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Pilih Metode</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <Button
-                    variant={scanMode === "qr" ? "default" : "outline"}
-                    onClick={() => setScanMode("qr")}
-                    className="h-auto py-6"
-                  >
-                    <div className="text-center">
-                      <QrCode className="h-8 w-8 mx-auto mb-2" />
-                      <div className="font-semibold">Scan QR Code</div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Metode tercepat
-                      </div>
-                    </div>
-                  </Button>
-                  <Button
-                    variant={scanMode === "manual" ? "default" : "outline"}
-                    onClick={() => setScanMode("manual")}
-                    className="h-auto py-6"
-                  >
-                    <div className="text-center">
-                      <FileText className="h-8 w-8 mx-auto mb-2" />
-                      <div className="font-semibold">Input Manual</div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Jika scan tidak bisa
-                      </div>
-                    </div>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
             {scanMode === "qr" ? (
               <QRScanner
                 onScanSuccess={handleQRScan}
                 onClose={() => navigate("/")}
+                onUnavailable={() => {
+                  setCameraUnavailable(true);
+                  setScanMode("manual");
+                }}
               />
             ) : (
               <Card>
@@ -274,6 +229,15 @@ const BorrowFlow = () => {
                   <CardTitle>Masukkan Kode Barang</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {cameraUnavailable && (
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Kamera tidak tersedia atau akses ditolak. Silakan input
+                        kode barang secara manual.
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   <div>
                     <Label htmlFor="manual-code">Kode Barang</Label>
                     <Input
@@ -287,6 +251,13 @@ const BorrowFlow = () => {
                   </div>
                   <Button onClick={handleManualCode} className="w-full">
                     Cari Barang
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setScanMode("qr")}
+                  >
+                    <QrCode className="h-4 w-4 mr-2" /> Coba Scan Lagi
                   </Button>
                 </CardContent>
               </Card>

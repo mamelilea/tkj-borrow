@@ -3,12 +3,12 @@ const db = require('../config/database');
 // Get all barang
 exports.getAllBarang = async (req, res) => {
   try {
-    const [rows] = await db.query(
+    const result = await db.query(
       'SELECT id_barang as id, kode_barang, nama_barang, jumlah_stok, jumlah_dipinjam, foto_barang, notes, created_at FROM barang ORDER BY created_at DESC'
     );
     res.json({
       success: true,
-      data: rows,
+      data: result.rows,
     });
   } catch (error) {
     console.error('Error getting barang:', error);
@@ -24,12 +24,12 @@ exports.getAllBarang = async (req, res) => {
 exports.getBarangById = async (req, res) => {
   try {
     const { id } = req.params;
-    const [rows] = await db.query(
-      'SELECT id_barang as id, kode_barang, nama_barang, jumlah_stok, jumlah_dipinjam, foto_barang, notes, created_at FROM barang WHERE id_barang = ?',
+    const result = await db.query(
+      'SELECT id_barang as id, kode_barang, nama_barang, jumlah_stok, jumlah_dipinjam, foto_barang, notes, created_at FROM barang WHERE id_barang = $1',
       [id]
     );
     
-    if (rows.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Barang not found',
@@ -38,7 +38,7 @@ exports.getBarangById = async (req, res) => {
 
     res.json({
       success: true,
-      data: rows[0],
+      data: result.rows[0],
     });
   } catch (error) {
     console.error('Error getting barang:', error);
@@ -54,12 +54,12 @@ exports.getBarangById = async (req, res) => {
 exports.getBarangByKode = async (req, res) => {
   try {
     const { kode } = req.params;
-    const [rows] = await db.query(
-      'SELECT id_barang as id, kode_barang, nama_barang, jumlah_stok, jumlah_dipinjam, foto_barang, notes, created_at FROM barang WHERE kode_barang = ?',
+    const result = await db.query(
+      'SELECT id_barang as id, kode_barang, nama_barang, jumlah_stok, jumlah_dipinjam, foto_barang, notes, created_at FROM barang WHERE kode_barang = $1',
       [kode]
     );
     
-    if (rows.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Barang not found',
@@ -68,7 +68,7 @@ exports.getBarangByKode = async (req, res) => {
 
     res.json({
       success: true,
-      data: rows[0],
+      data: result.rows[0],
     });
   } catch (error) {
     console.error('Error getting barang:', error);
@@ -92,25 +92,27 @@ exports.createBarang = async (req, res) => {
       });
     }
 
-    const [result] = await db.query(
-      'INSERT INTO barang (kode_barang, nama_barang, jumlah_stok, foto_barang, notes) VALUES (?, ?, ?, ?, ?)',
+    const result = await db.query(
+      'INSERT INTO barang (kode_barang, nama_barang, jumlah_stok, foto_barang, notes) VALUES ($1, $2, $3, $4, $5) RETURNING id_barang',
       [kode_barang, nama_barang, jumlah_stok, foto_barang || null, notes || null]
     );
 
+    const newId = result.rows[0].id_barang;
+
     // Get the created item with id alias
-    const [newItem] = await db.query(
-      'SELECT id_barang as id, kode_barang, nama_barang, jumlah_stok, jumlah_dipinjam, foto_barang, notes, created_at FROM barang WHERE id_barang = ?',
-      [result.insertId]
+    const newItemResult = await db.query(
+      'SELECT id_barang as id, kode_barang, nama_barang, jumlah_stok, jumlah_dipinjam, foto_barang, notes, created_at FROM barang WHERE id_barang = $1',
+      [newId]
     );
 
     res.status(201).json({
       success: true,
       message: 'Barang created successfully',
-      data: newItem[0],
+      data: newItemResult.rows[0],
     });
   } catch (error) {
     console.error('Error creating barang:', error);
-    if (error.code === 'ER_DUP_ENTRY') {
+    if (error.code === '23505') { // PostgreSQL duplicate key error
       return res.status(400).json({
         success: false,
         message: 'Kode barang sudah digunakan',
@@ -130,12 +132,12 @@ exports.updateBarang = async (req, res) => {
     const { id } = req.params;
     const { nama_barang, jumlah_stok, foto_barang, notes } = req.body;
 
-    const [result] = await db.query(
-      'UPDATE barang SET nama_barang = ?, jumlah_stok = ?, foto_barang = ?, notes = ? WHERE id_barang = ?',
+    const result = await db.query(
+      'UPDATE barang SET nama_barang = $1, jumlah_stok = $2, foto_barang = $3, notes = $4 WHERE id_barang = $5',
       [nama_barang, jumlah_stok, foto_barang || null, notes || null, id]
     );
 
-    if (result.affectedRows === 0) {
+    if (result.rowCount === 0) {
       return res.status(404).json({
         success: false,
         message: 'Barang not found',
@@ -162,24 +164,24 @@ exports.deleteBarang = async (req, res) => {
     const { id } = req.params;
 
     // Check if barang has active peminjaman
-    const [borrowings] = await db.query(
-      'SELECT * FROM peminjaman WHERE id_barang = ? AND status = "Dipinjam"',
-      [id]
+    const borrowResult = await db.query(
+      'SELECT * FROM peminjaman WHERE id_barang = $1 AND status = $2',
+      [id, 'Dipinjam']
     );
 
-    if (borrowings.length > 0) {
+    if (borrowResult.rows.length > 0) {
       return res.status(400).json({
         success: false,
         message: 'Tidak dapat menghapus barang yang sedang dipinjam',
       });
     }
 
-    const [result] = await db.query(
-      'DELETE FROM barang WHERE id_barang = ?',
+    const result = await db.query(
+      'DELETE FROM barang WHERE id_barang = $1',
       [id]
     );
 
-    if (result.affectedRows === 0) {
+    if (result.rowCount === 0) {
       return res.status(404).json({
         success: false,
         message: 'Barang not found',

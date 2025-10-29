@@ -25,17 +25,17 @@ exports.getAllPeminjaman = async (req, res) => {
     const params = [];
     
     if (status && status !== 'all') {
-      query += ' WHERE p.status = ?';
+      query += ' WHERE p.status = $1';
       params.push(status);
     }
     
     query += ' ORDER BY p.created_at DESC';
     
-    const [rows] = await db.query(query, params);
+    const result = await db.query(query, params);
     
     res.json({
       success: true,
-      data: rows,
+      data: result.rows,
     });
   } catch (error) {
     console.error('Error getting peminjaman:', error);
@@ -52,18 +52,18 @@ exports.getPeminjamanByCode = async (req, res) => {
   try {
     const { kode } = req.params;
     
-    const [rows] = await db.query(
+    const result = await db.query(
       `SELECT p.id_peminjaman as id, p.kode_peminjaman, p.id_barang, p.nama_peminjam, p.kontak, 
               p.keperluan, p.guru_pendamping, p.jumlah, p.foto_credential, p.tanggal_pinjam, 
               p.tanggal_kembali, p.status, p.signature, p.created_at,
               b.nama_barang, b.kode_barang, b.foto_barang
        FROM peminjaman p
        LEFT JOIN barang b ON p.id_barang = b.id_barang
-       WHERE p.kode_peminjaman = ?`,
+       WHERE p.kode_peminjaman = $1`,
       [kode]
     );
     
-    if (rows.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Peminjaman not found',
@@ -72,7 +72,7 @@ exports.getPeminjamanByCode = async (req, res) => {
 
     res.json({
       success: true,
-      data: rows[0],
+      data: result.rows[0],
     });
   } catch (error) {
     console.error('Error getting peminjaman:', error);
@@ -86,10 +86,10 @@ exports.getPeminjamanByCode = async (req, res) => {
 
 // Create new peminjaman
 exports.createPeminjaman = async (req, res) => {
-  const connection = await db.getConnection();
+  const client = await db.connect();
   
   try {
-    await connection.beginTransaction();
+    await client.query('BEGIN');
 
     const {
       id_barang,
@@ -103,7 +103,7 @@ exports.createPeminjaman = async (req, res) => {
 
     // Validate required fields
     if (!id_barang || !nama_peminjam || !keperluan || !guru_pendamping || !jumlah) {
-      await connection.rollback();
+      await client.query('ROLLBACK');
       console.error('Missing required fields:', {
         id_barang, nama_peminjam, keperluan, guru_pendamping, jumlah
       });
@@ -119,24 +119,24 @@ exports.createPeminjaman = async (req, res) => {
     });
 
     // Check barang availability
-    const [barangRows] = await connection.query(
-      'SELECT jumlah_stok, jumlah_dipinjam FROM barang WHERE id_barang = ?',
+    const barangResult = await client.query(
+      'SELECT jumlah_stok, jumlah_dipinjam FROM barang WHERE id_barang = $1',
       [id_barang]
     );
 
-    if (barangRows.length === 0) {
-      await connection.rollback();
+    if (barangResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({
         success: false,
         message: 'Barang tidak ditemukan',
       });
     }
 
-    const barang = barangRows[0];
+    const barang = barangResult.rows[0];
     const available = barang.jumlah_stok - barang.jumlah_dipinjam;
 
     if (available < jumlah) {
-      await connection.rollback();
+      await client.query('ROLLBACK');
       return res.status(400).json({
         success: false,
         message: `Stok tidak mencukupi. Tersedia: ${available}`,
@@ -147,26 +147,28 @@ exports.createPeminjaman = async (req, res) => {
     const kode_peminjaman = generateBorrowingCode();
 
     // Insert peminjaman
-    const [result] = await connection.query(
+    const result = await client.query(
       `INSERT INTO peminjaman 
        (kode_peminjaman, id_barang, nama_peminjam, kontak, keperluan, guru_pendamping, jumlah, foto_credential) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id_peminjaman`,
       [kode_peminjaman, id_barang, nama_peminjam, kontak || null, keperluan, guru_pendamping, jumlah, foto_credential || null]
     );
 
+    const newId = result.rows[0].id_peminjaman;
+
     // Update barang jumlah_dipinjam
-    await connection.query(
-      'UPDATE barang SET jumlah_dipinjam = jumlah_dipinjam + ? WHERE id_barang = ?',
+    await client.query(
+      'UPDATE barang SET jumlah_dipinjam = jumlah_dipinjam + $1 WHERE id_barang = $2',
       [jumlah, id_barang]
     );
 
-    await connection.commit();
+    await client.query('COMMIT');
 
     res.status(201).json({
       success: true,
       message: 'Peminjaman berhasil dibuat',
       data: {
-        id_peminjaman: result.insertId,
+        id_peminjaman: newId,
         kode_peminjaman,
         id_barang,
         nama_peminjam,
@@ -174,7 +176,7 @@ exports.createPeminjaman = async (req, res) => {
       },
     });
   } catch (error) {
-    await connection.rollback();
+    await client.query('ROLLBACK');
     console.error('Error creating peminjaman:', error);
     res.status(500).json({
       success: false,
@@ -182,49 +184,49 @@ exports.createPeminjaman = async (req, res) => {
       error: error.message,
     });
   } finally {
-    connection.release();
+    client.release();
   }
 };
 
 // Return barang (update status to Dikembalikan)
 exports.returnBarang = async (req, res) => {
-  const connection = await db.getConnection();
+  const client = await db.connect();
   
   try {
-    await connection.beginTransaction();
+    await client.query('BEGIN');
 
     const { kode_peminjaman } = req.params;
     const { foto_verifikasi } = req.body;
 
     // Get peminjaman data
-    const [peminjamanRows] = await connection.query(
-      'SELECT * FROM peminjaman WHERE kode_peminjaman = ? AND status = "Dipinjam"',
-      [kode_peminjaman]
+    const peminjamanResult = await client.query(
+      'SELECT * FROM peminjaman WHERE kode_peminjaman = $1 AND status = $2',
+      [kode_peminjaman, 'Dipinjam']
     );
 
-    if (peminjamanRows.length === 0) {
-      await connection.rollback();
+    if (peminjamanResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({
         success: false,
         message: 'Peminjaman tidak ditemukan atau sudah dikembalikan',
       });
     }
 
-    const peminjaman = peminjamanRows[0];
+    const peminjaman = peminjamanResult.rows[0];
 
     // Update peminjaman status
-    await connection.query(
-      'UPDATE peminjaman SET status = "Dikembalikan", tanggal_kembali = NOW() WHERE kode_peminjaman = ?',
-      [kode_peminjaman]
+    await client.query(
+      'UPDATE peminjaman SET status = $1, tanggal_kembali = NOW() WHERE kode_peminjaman = $2',
+      ['Dikembalikan', kode_peminjaman]
     );
 
     // Update barang jumlah_dipinjam
-    await connection.query(
-      'UPDATE barang SET jumlah_dipinjam = jumlah_dipinjam - ? WHERE id_barang = ?',
+    await client.query(
+      'UPDATE barang SET jumlah_dipinjam = jumlah_dipinjam - $1 WHERE id_barang = $2',
       [peminjaman.jumlah, peminjaman.id_barang]
     );
 
-    await connection.commit();
+    await client.query('COMMIT');
 
     res.json({
       success: true,
@@ -235,7 +237,7 @@ exports.returnBarang = async (req, res) => {
       },
     });
   } catch (error) {
-    await connection.rollback();
+    await client.query('ROLLBACK');
     console.error('Error returning barang:', error);
     res.status(500).json({
       success: false,
@@ -243,7 +245,7 @@ exports.returnBarang = async (req, res) => {
       error: error.message,
     });
   } finally {
-    connection.release();
+    client.release();
   }
 };
 
@@ -257,9 +259,9 @@ exports.updatePeminjaman = async (req, res) => {
     const updateFields = [];
     const updateValues = [];
 
-    allowedUpdates.forEach(field => {
+    allowedUpdates.forEach((field, index) => {
       if (updates[field] !== undefined) {
-        updateFields.push(`${field} = ?`);
+        updateFields.push(`${field} = $${index + 1}`);
         updateValues.push(updates[field]);
       }
     });
@@ -271,14 +273,15 @@ exports.updatePeminjaman = async (req, res) => {
       });
     }
 
+    // Add id at the end
     updateValues.push(id);
 
-    const [result] = await db.query(
-      `UPDATE peminjaman SET ${updateFields.join(', ')} WHERE id_peminjaman = ?`,
+    const result = await db.query(
+      `UPDATE peminjaman SET ${updateFields.join(', ')} WHERE id_peminjaman = $${updateValues.length}`,
       updateValues
     );
 
-    if (result.affectedRows === 0) {
+    if (result.rowCount === 0) {
       return res.status(404).json({
         success: false,
         message: 'Peminjaman not found',
@@ -301,51 +304,51 @@ exports.updatePeminjaman = async (req, res) => {
 
 // Delete peminjaman
 exports.deletePeminjaman = async (req, res) => {
-  const connection = await db.getConnection();
+  const client = await db.connect();
   
   try {
-    await connection.beginTransaction();
+    await client.query('BEGIN');
 
     const { id } = req.params;
 
     // Get peminjaman data
-    const [peminjamanRows] = await connection.query(
-      'SELECT * FROM peminjaman WHERE id_peminjaman = ?',
+    const peminjamanResult = await client.query(
+      'SELECT * FROM peminjaman WHERE id_peminjaman = $1',
       [id]
     );
 
-    if (peminjamanRows.length === 0) {
-      await connection.rollback();
+    if (peminjamanResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({
         success: false,
         message: 'Peminjaman not found',
       });
     }
 
-    const peminjaman = peminjamanRows[0];
+    const peminjaman = peminjamanResult.rows[0];
 
     // If still borrowed, update barang count
     if (peminjaman.status === 'Dipinjam') {
-      await connection.query(
-        'UPDATE barang SET jumlah_dipinjam = jumlah_dipinjam - ? WHERE id_barang = ?',
+      await client.query(
+        'UPDATE barang SET jumlah_dipinjam = jumlah_dipinjam - $1 WHERE id_barang = $2',
         [peminjaman.jumlah, peminjaman.id_barang]
       );
     }
 
     // Delete peminjaman
-    await connection.query(
-      'DELETE FROM peminjaman WHERE id_peminjaman = ?',
+    await client.query(
+      'DELETE FROM peminjaman WHERE id_peminjaman = $1',
       [id]
     );
 
-    await connection.commit();
+    await client.query('COMMIT');
 
     res.json({
       success: true,
       message: 'Peminjaman deleted successfully',
     });
   } catch (error) {
-    await connection.rollback();
+    await client.query('ROLLBACK');
     console.error('Error deleting peminjaman:', error);
     res.status(500).json({
       success: false,
@@ -353,29 +356,29 @@ exports.deletePeminjaman = async (req, res) => {
       error: error.message,
     });
   } finally {
-    connection.release();
+    client.release();
   }
 };
 
 // Get statistics
 exports.getStatistics = async (req, res) => {
   try {
-    const [totalBarang] = await db.query('SELECT COUNT(*) as count FROM barang');
-    const [totalPeminjaman] = await db.query('SELECT COUNT(*) as count FROM peminjaman');
-    const [activePeminjaman] = await db.query('SELECT COUNT(*) as count FROM peminjaman WHERE status = "Dipinjam"');
-    const [completedPeminjaman] = await db.query('SELECT COUNT(*) as count FROM peminjaman WHERE status = "Dikembalikan"');
-    const [totalStok] = await db.query('SELECT SUM(jumlah_stok) as total, SUM(jumlah_dipinjam) as dipinjam FROM barang');
+    const totalBarang = await db.query('SELECT COUNT(*) as count FROM barang');
+    const totalPeminjaman = await db.query('SELECT COUNT(*) as count FROM peminjaman');
+    const activePeminjaman = await db.query('SELECT COUNT(*) as count FROM peminjaman WHERE status = $1', ['Dipinjam']);
+    const completedPeminjaman = await db.query('SELECT COUNT(*) as count FROM peminjaman WHERE status = $1', ['Dikembalikan']);
+    const totalStok = await db.query('SELECT SUM(jumlah_stok) as total, SUM(jumlah_dipinjam) as dipinjam FROM barang');
 
     res.json({
       success: true,
       data: {
-        total_barang: totalBarang[0].count,
-        total_peminjaman: totalPeminjaman[0].count,
-        active_peminjaman: activePeminjaman[0].count,
-        completed_peminjaman: completedPeminjaman[0].count,
-        total_stok: totalStok[0].total || 0,
-        total_dipinjam: totalStok[0].dipinjam || 0,
-        total_tersedia: (totalStok[0].total || 0) - (totalStok[0].dipinjam || 0),
+        total_barang: parseInt(totalBarang.rows[0].count),
+        total_peminjaman: parseInt(totalPeminjaman.rows[0].count),
+        active_peminjaman: parseInt(activePeminjaman.rows[0].count),
+        completed_peminjaman: parseInt(completedPeminjaman.rows[0].count),
+        total_stok: parseInt(totalStok.rows[0].total) || 0,
+        total_dipinjam: parseInt(totalStok.rows[0].dipinjam) || 0,
+        total_tersedia: (parseInt(totalStok.rows[0].total) || 0) - (parseInt(totalStok.rows[0].dipinjam) || 0),
       },
     });
   } catch (error) {

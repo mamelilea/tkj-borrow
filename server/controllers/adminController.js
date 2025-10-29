@@ -15,19 +15,19 @@ exports.login = async (req, res) => {
     }
 
     // Get admin from database
-    const [rows] = await db.query(
-      'SELECT * FROM admin WHERE username = ?',
+    const result = await db.query(
+      'SELECT * FROM admin WHERE username = $1',
       [username]
     );
 
-    if (rows.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(401).json({
         success: false,
         message: 'Username atau password salah',
       });
     }
 
-    const admin = rows[0];
+    const admin = result.rows[0];
 
     // Verify password
     const isValidPassword = await bcrypt.compare(password, admin.password);
@@ -85,12 +85,12 @@ exports.register = async (req, res) => {
     }
 
     // Check if username already exists
-    const [existing] = await db.query(
-      'SELECT * FROM admin WHERE username = ?',
+    const existing = await db.query(
+      'SELECT * FROM admin WHERE username = $1',
       [username]
     );
 
-    if (existing.length > 0) {
+    if (existing.rows.length > 0) {
       return res.status(400).json({
         success: false,
         message: 'Username sudah digunakan',
@@ -101,8 +101,8 @@ exports.register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Insert new admin
-    const [result] = await db.query(
-      'INSERT INTO admin (username, password, nama_lengkap) VALUES (?, ?, ?)',
+    const result = await db.query(
+      'INSERT INTO admin (username, password, nama_lengkap) VALUES ($1, $2, $3) RETURNING id_admin',
       [username, hashedPassword, nama_lengkap]
     );
 
@@ -110,7 +110,7 @@ exports.register = async (req, res) => {
       success: true,
       message: 'Admin berhasil didaftarkan',
       data: {
-        id: result.insertId,
+        id: result.rows[0].id_admin,
         username,
         nama_lengkap,
       },
@@ -151,12 +151,12 @@ exports.verifyToken = (req, res, next) => {
 // Get current admin profile
 exports.getProfile = async (req, res) => {
   try {
-    const [rows] = await db.query(
-      'SELECT id_admin, username, nama_lengkap, created_at FROM admin WHERE id_admin = ?',
+    const result = await db.query(
+      'SELECT id_admin, username, nama_lengkap, created_at FROM admin WHERE id_admin = $1',
       [req.admin.id]
     );
 
-    if (rows.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Admin not found',
@@ -165,7 +165,7 @@ exports.getProfile = async (req, res) => {
 
     res.json({
       success: true,
-      data: rows[0],
+      data: result.rows[0],
     });
   } catch (error) {
     console.error('Error getting profile:', error);

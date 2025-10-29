@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Search, Download, Eye, Edit, Trash2, Calendar } from "lucide-react";
+import { Search, Download, Eye, Trash2, Calendar } from "lucide-react";
 import { Borrowing } from "@/types";
 import { toast } from "react-hot-toast";
 import { peminjamanAPI } from "@/lib/api";
@@ -34,7 +34,9 @@ const Borrowings = () => {
   const [borrowings, setBorrowings] = useState<Borrowing[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [selectedBorrowing, setSelectedBorrowing] = useState<Borrowing | null>(null);
+  const [selectedBorrowing, setSelectedBorrowing] = useState<Borrowing | null>(
+    null
+  );
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -57,11 +59,16 @@ const Borrowings = () => {
 
   const filteredBorrowings = borrowings.filter((borrowing) => {
     const matchesSearch =
-      borrowing.kode_peminjaman.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      borrowing.nama_peminjam.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      borrowing.kode_peminjaman
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
+      borrowing.nama_peminjam
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
       borrowing.nama_barang?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesStatus = statusFilter === "all" || borrowing.status === statusFilter;
+    const matchesStatus =
+      statusFilter === "all" || borrowing.status === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
@@ -75,7 +82,7 @@ const Borrowings = () => {
     if (confirm("Apakah Anda yakin ingin menghapus data peminjaman ini?")) {
       try {
         await peminjamanAPI.delete(id);
-        setBorrowings(borrowings.filter(b => b.id !== id));
+        setBorrowings(borrowings.filter((b) => b.id !== id));
         toast.success("Data peminjaman berhasil dihapus!");
       } catch (error) {
         console.error("Error deleting borrowing:", error);
@@ -91,8 +98,8 @@ const Borrowings = () => {
 
   const stats = {
     total: borrowings.length,
-    active: borrowings.filter(b => b.status === 'Dipinjam').length,
-    completed: borrowings.filter(b => b.status === 'Dikembalikan').length,
+    active: borrowings.filter((b) => b.status === "Dipinjam").length,
+    completed: borrowings.filter((b) => b.status === "Dikembalikan").length,
   };
 
   return (
@@ -130,7 +137,9 @@ const Borrowings = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-warning">{stats.active}</div>
+              <div className="text-3xl font-bold text-warning">
+                {stats.active}
+              </div>
             </CardContent>
           </Card>
           <Card>
@@ -140,7 +149,9 @@ const Borrowings = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-success">{stats.completed}</div>
+              <div className="text-3xl font-bold text-success">
+                {stats.completed}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -175,7 +186,9 @@ const Borrowings = () => {
         {/* Table */}
         <Card>
           <CardHeader>
-            <CardTitle>Daftar Peminjaman ({filteredBorrowings.length})</CardTitle>
+            <CardTitle>
+              Daftar Peminjaman ({filteredBorrowings.length})
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -205,17 +218,22 @@ const Borrowings = () => {
                         <div className="text-sm">
                           <div className="flex items-center gap-1">
                             <Calendar className="h-3 w-3 text-muted-foreground" />
-                            {new Date(borrowing.tanggal_pinjam).toLocaleDateString('id-ID', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric'
+                            {new Date(
+                              borrowing.tanggal_pinjam
+                            ).toLocaleDateString("id-ID", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
                             })}
                           </div>
                           {borrowing.tanggal_kembali && (
                             <div className="text-xs text-muted-foreground mt-1">
-                              Kembali: {new Date(borrowing.tanggal_kembali).toLocaleDateString('id-ID', {
-                                day: '2-digit',
-                                month: 'short'
+                              Kembali:{" "}
+                              {new Date(
+                                borrowing.tanggal_kembali
+                              ).toLocaleDateString("id-ID", {
+                                day: "2-digit",
+                                month: "short",
                               })}
                             </div>
                           )}
@@ -231,20 +249,38 @@ const Borrowings = () => {
                             />
                           )}
                           <div>
-                            <div className="font-medium">{borrowing.nama_peminjam}</div>
-                            <div className="text-xs text-muted-foreground">{borrowing.kontak}</div>
+                            <div className="font-medium">
+                              {borrowing.nama_peminjam}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {borrowing.kontak}
+                            </div>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">{borrowing.nama_barang}</div>
-                        <div className="text-xs text-muted-foreground">{borrowing.keperluan}</div>
+                        <div className="font-medium">
+                          {borrowing.nama_barang}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {borrowing.keperluan}
+                        </div>
                       </TableCell>
-                      <TableCell className="font-medium">{borrowing.jumlah}x</TableCell>
+                      <TableCell className="font-medium">
+                        {borrowing.jumlah}x
+                      </TableCell>
                       <TableCell>
                         <Badge
-                          variant={borrowing.status === 'Dipinjam' ? 'default' : 'secondary'}
-                          className={borrowing.status === 'Dipinjam' ? 'bg-warning' : 'bg-success'}
+                          variant={
+                            borrowing.status === "Dipinjam"
+                              ? "default"
+                              : "secondary"
+                          }
+                          className={
+                            borrowing.status === "Dipinjam"
+                              ? "bg-warning"
+                              : "bg-success"
+                          }
                         >
                           {borrowing.status}
                         </Badge>
@@ -258,12 +294,7 @@ const Borrowings = () => {
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                          {/* Edit action removed as peminjaman is not editable */}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -298,8 +329,16 @@ const Borrowings = () => {
                   </div>
                   <div className="flex justify-center">
                     <Badge
-                      variant={selectedBorrowing.status === 'Dipinjam' ? 'default' : 'secondary'}
-                      className={selectedBorrowing.status === 'Dipinjam' ? 'bg-warning' : 'bg-success'}
+                      variant={
+                        selectedBorrowing.status === "Dipinjam"
+                          ? "default"
+                          : "secondary"
+                      }
+                      className={
+                        selectedBorrowing.status === "Dipinjam"
+                          ? "bg-warning"
+                          : "bg-success"
+                      }
                     >
                       {selectedBorrowing.status}
                     </Badge>
@@ -312,15 +351,21 @@ const Borrowings = () => {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Nama:</span>
-                        <span className="font-medium">{selectedBorrowing.nama_peminjam}</span>
+                        <span className="font-medium">
+                          {selectedBorrowing.nama_peminjam}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Kontak:</span>
-                        <span className="font-medium">{selectedBorrowing.kontak}</span>
+                        <span className="font-medium">
+                          {selectedBorrowing.kontak}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Guru:</span>
-                        <span className="font-medium">{selectedBorrowing.guru_pendamping}</span>
+                        <span className="font-medium">
+                          {selectedBorrowing.guru_pendamping}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -330,15 +375,23 @@ const Borrowings = () => {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Barang:</span>
-                        <span className="font-medium">{selectedBorrowing.nama_barang}</span>
+                        <span className="font-medium">
+                          {selectedBorrowing.nama_barang}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Jumlah:</span>
-                        <span className="font-medium">{selectedBorrowing.jumlah}</span>
+                        <span className="font-medium">
+                          {selectedBorrowing.jumlah}
+                        </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Keperluan:</span>
-                        <span className="font-medium">{selectedBorrowing.keperluan}</span>
+                        <span className="text-muted-foreground">
+                          Keperluan:
+                        </span>
+                        <span className="font-medium">
+                          {selectedBorrowing.keperluan}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -348,16 +401,24 @@ const Borrowings = () => {
                   <h4 className="font-semibold mb-3">Timeline</h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Tanggal Pinjam:</span>
+                      <span className="text-muted-foreground">
+                        Tanggal Pinjam:
+                      </span>
                       <span className="font-medium">
-                        {new Date(selectedBorrowing.tanggal_pinjam).toLocaleString('id-ID')}
+                        {new Date(
+                          selectedBorrowing.tanggal_pinjam
+                        ).toLocaleString("id-ID")}
                       </span>
                     </div>
                     {selectedBorrowing.tanggal_kembali && (
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Tanggal Kembali:</span>
+                        <span className="text-muted-foreground">
+                          Tanggal Kembali:
+                        </span>
                         <span className="font-medium">
-                          {new Date(selectedBorrowing.tanggal_kembali).toLocaleString('id-ID')}
+                          {new Date(
+                            selectedBorrowing.tanggal_kembali
+                          ).toLocaleString("id-ID")}
                         </span>
                       </div>
                     )}
@@ -375,7 +436,10 @@ const Borrowings = () => {
                   </div>
                 )}
 
-                <Button onClick={() => setDetailDialogOpen(false)} className="w-full">
+                <Button
+                  onClick={() => setDetailDialogOpen(false)}
+                  className="w-full"
+                >
                   Tutup
                 </Button>
               </div>

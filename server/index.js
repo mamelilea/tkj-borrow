@@ -57,7 +57,10 @@ app.use((req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`📁 Environment: ${process.env.NODE_ENV}`);
-  console.log(`🗄️  Database: ${process.env.DB_NAME}@${process.env.DB_HOST}`);
+  const dbInfo = process.env.DATABASE_URL 
+    ? `postgres://${process.env.DATABASE_URL.split('@')[1]}` 
+    : `${process.env.DB_NAME}@${process.env.DB_HOST}`;
+  console.log(`🗄️  Database: ${dbInfo}`);
 });
 
 module.exports = app;

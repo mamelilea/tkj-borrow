@@ -1,30 +1,37 @@
-const mysql = require('mysql2');
+const { Pool } = require('pg');
 require('dotenv').config();
 
-// Create connection pool
-const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT || 3306,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-});
+// Support connection string atau individual params
+const poolConfig = process.env.DATABASE_URL 
+  ? { connectionString: process.env.DATABASE_URL }
+  : {
+      host: process.env.DB_HOST,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+      port: process.env.DB_PORT || 5432,
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+    };
 
-// Get promise-based connection
-const promisePool = pool.promise();
+poolConfig.ssl = { rejectUnauthorized: false };
+
+// Force IPv4 to avoid ENETUNREACH error on Railway
+poolConfig.family = 4;
+
+// Create connection pool for PostgreSQL
+const pool = new Pool(poolConfig);
 
 // Test connection
-pool.getConnection((err, connection) => {
+pool.query('SELECT NOW()', (err, res) => {
   if (err) {
     console.error('❌ Database connection failed:', err.message);
+    console.error('   Connection string:', process.env.DATABASE_URL?.replace(/:[^:@]+@/, ':****@'));
     console.error('   Check your .env file configuration');
     return;
   }
-  console.log('✅ Database connected successfully');
-  connection.release();
+  console.log('✅ PostgreSQL database connected successfully');
 });
 
-module.exports = promisePool;
+module.exports = pool;

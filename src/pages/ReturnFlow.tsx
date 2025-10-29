@@ -278,7 +278,7 @@ const ReturnFlow = () => {
 
               <Alert className="bg-success/10 border-success">
                 <CheckCircle className="h-4 w-4 text-success" />
-                <AlertDescription className="text-success-foreground">
+                <AlertDescription className="text-success-foreground text-black">
                   Status barang telah diperbarui. Barang kembali tersedia untuk
                   dipinjam.
                 </AlertDescription>

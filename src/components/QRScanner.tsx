@@ -8,25 +8,61 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
   onClose?: () => void;
+  onUnavailable?: () => void;
 }
 
-const QRScanner = ({ onScanSuccess, onClose }: QRScannerProps) => {
+const QRScanner = ({
+  onScanSuccess,
+  onClose,
+  onUnavailable,
+}: QRScannerProps) => {
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string>("");
   const scannerRef = useRef<Html5Qrcode | null>(null);
-  const [cameraPermission, setCameraPermission] = useState<"granted" | "denied" | "prompt">("prompt");
+  const hasStoppedRef = useRef<boolean>(false);
+  const [cameraPermission, setCameraPermission] = useState<
+    "granted" | "denied" | "prompt"
+  >("prompt");
 
   useEffect(() => {
     return () => {
-      if (scannerRef.current && isScanning) {
-        scannerRef.current.stop().catch(console.error);
+      // Ensure we attempt to stop only once during unmount
+      if (scannerRef.current && !hasStoppedRef.current) {
+        hasStoppedRef.current = true;
+        scannerRef.current
+          .stop()
+          .catch(() => {})
+          .finally(() => {
+            scannerRef.current = null;
+          });
       }
     };
-  }, [isScanning]);
+  }, []);
+
+  const stopScanner = async (shouldClose?: boolean) => {
+    if (hasStoppedRef.current) {
+      if (shouldClose) onClose?.();
+      return;
+    }
+    hasStoppedRef.current = true;
+    try {
+      if (scannerRef.current) {
+        await scannerRef.current.stop();
+      }
+    } catch (_) {
+      // Swallow errors from double-stops or invalid state
+    } finally {
+      setIsScanning(false);
+      scannerRef.current = null;
+      if (shouldClose) onClose?.();
+    }
+  };
 
   const startScanning = async () => {
     try {
       setError("");
+      hasStoppedRef.current = false;
+      if (isScanning) return; // avoid starting twice
       const html5QrCode = new Html5Qrcode("qr-reader");
       scannerRef.current = html5QrCode;
 
@@ -36,11 +72,9 @@ const QRScanner = ({ onScanSuccess, onClose }: QRScannerProps) => {
           fps: 10,
           qrbox: { width: 250, height: 250 },
         },
-        (decodedText) => {
-          html5QrCode.stop().then(() => {
-            setIsScanning(false);
-            onScanSuccess(decodedText);
-          }).catch(console.error);
+        async (decodedText) => {
+          await stopScanner(false);
+          onScanSuccess(decodedText);
         },
         (errorMessage) => {
           // Ignore scanning errors (too frequent)
@@ -52,19 +86,15 @@ const QRScanner = ({ onScanSuccess, onClose }: QRScannerProps) => {
     } catch (err: any) {
       console.error("Error starting scanner:", err);
       setCameraPermission("denied");
-      setError("Tidak dapat mengakses kamera. Pastikan izin kamera telah diberikan.");
+      setError(
+        "Tidak dapat mengakses kamera. Pastikan izin kamera telah diberikan."
+      );
+      onUnavailable?.();
     }
   };
 
   const stopScanning = () => {
-    if (scannerRef.current && isScanning) {
-      scannerRef.current.stop().then(() => {
-        setIsScanning(false);
-        onClose?.();
-      }).catch(console.error);
-    } else {
-      onClose?.();
-    }
+    stopScanner(true);
   };
 
   return (
@@ -75,11 +105,7 @@ const QRScanner = ({ onScanSuccess, onClose }: QRScannerProps) => {
             <QrCode className="h-5 w-5 text-primary" />
             <h3 className="font-semibold text-lg">Scan QR Code</h3>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={stopScanning}
-          >
+          <Button variant="ghost" size="icon" onClick={stopScanning}>
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -98,8 +124,8 @@ const QRScanner = ({ onScanSuccess, onClose }: QRScannerProps) => {
               <div className="text-center space-y-4">
                 <QrCode className="h-16 w-16 text-muted-foreground mx-auto" />
                 <p className="text-sm text-muted-foreground">
-                  {cameraPermission === "denied" 
-                    ? "Akses kamera ditolak" 
+                  {cameraPermission === "denied"
+                    ? "Akses kamera ditolak"
                     : "Klik tombol di bawah untuk memulai scan"}
                 </p>
               </div>
