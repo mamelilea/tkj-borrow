@@ -26,8 +26,8 @@ const QRScanner = ({
 
   useEffect(() => {
     return () => {
-      // Ensure we attempt to stop only once during unmount
-      if (scannerRef.current && !hasStoppedRef.current) {
+      // Cleanup: only stop if scanner was actually running
+      if (scannerRef.current && !hasStoppedRef.current && isScanning) {
         hasStoppedRef.current = true;
         scannerRef.current
           .stop()
@@ -37,7 +37,7 @@ const QRScanner = ({
           });
       }
     };
-  }, []);
+  }, [isScanning]);
 
   const stopScanner = async (shouldClose?: boolean) => {
     if (hasStoppedRef.current) {
@@ -46,11 +46,13 @@ const QRScanner = ({
     }
     hasStoppedRef.current = true;
     try {
-      if (scannerRef.current) {
+      if (scannerRef.current && isScanning) {
         await scannerRef.current.stop();
       }
-    } catch (_) {
+    } catch (err) {
       // Swallow errors from double-stops or invalid state
+      // This is expected when scanner was never started successfully
+      console.log("Scanner stop error (safe to ignore):", err);
     } finally {
       setIsScanning(false);
       scannerRef.current = null;
@@ -64,7 +66,6 @@ const QRScanner = ({
       hasStoppedRef.current = false;
       if (isScanning) return; // avoid starting twice
       const html5QrCode = new Html5Qrcode("qr-reader");
-      scannerRef.current = html5QrCode;
 
       await html5QrCode.start(
         { facingMode: "environment" },
@@ -81,15 +82,36 @@ const QRScanner = ({
         }
       );
 
+      // Only set refs and state after successful start
+      scannerRef.current = html5QrCode;
       setIsScanning(true);
       setCameraPermission("granted");
     } catch (err: any) {
       console.error("Error starting scanner:", err);
+
+      // Clear scanner ref since start failed
+      scannerRef.current = null;
+      hasStoppedRef.current = true; // Prevent stop errors
       setCameraPermission("denied");
-      setError(
-        "Tidak dapat mengakses kamera. Pastikan izin kamera telah diberikan."
-      );
-      onUnavailable?.();
+
+      // Check if it's a permission denied error
+      if (
+        err.name === "NotAllowedError" ||
+        err.message?.includes("Permission denied")
+      ) {
+        setError(
+          "Akses kamera ditolak. Silakan gunakan input manual di bawah."
+        );
+      } else {
+        setError(
+          "Tidak dapat mengakses kamera. Pastikan izin kamera telah diberikan atau gunakan input manual."
+        );
+      }
+
+      // Call onUnavailable after a brief delay to allow component to settle
+      setTimeout(() => {
+        onUnavailable?.();
+      }, 100);
     }
   };
 
@@ -143,10 +165,22 @@ const QRScanner = ({
               Batal
             </Button>
           )}
+
+          {cameraPermission === "denied" && onUnavailable && (
+            <Button
+              onClick={() => onUnavailable()}
+              variant="outline"
+              className="w-full"
+            >
+              Gunakan Input Manual
+            </Button>
+          )}
         </div>
 
         <p className="text-xs text-muted-foreground text-center">
-          Arahkan kamera ke QR Code yang ada pada barang
+          {cameraPermission === "denied"
+            ? "Atau klik tombol di atas untuk input kode manual"
+            : "Arahkan kamera ke QR Code yang ada pada barang"}
         </p>
       </div>
     </Card>

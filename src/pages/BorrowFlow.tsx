@@ -34,6 +34,7 @@ const BorrowFlow = () => {
   );
   const [scanMode, setScanMode] = useState<"qr" | "manual">("qr");
   const [cameraUnavailable, setCameraUnavailable] = useState<boolean>(false);
+  const [cameraChecked, setCameraChecked] = useState<boolean>(false);
   const [formData, setFormData] = useState<BorrowingFormData>({
     nama_peminjam: "",
     kontak: "",
@@ -44,6 +45,40 @@ const BorrowFlow = () => {
   });
   const [photoData, setPhotoData] = useState<string>("");
   const [borrowingCode, setBorrowingCode] = useState<string>("");
+
+  // Check camera availability on mount
+  useEffect(() => {
+    const checkCamera = async () => {
+      try {
+        // Check if mediaDevices is supported
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          setCameraUnavailable(true);
+          setScanMode("manual");
+          setCameraChecked(true);
+          return;
+        }
+
+        // Try to check camera permission
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+        });
+        // If successful, stop the stream immediately
+        stream.getTracks().forEach((track) => track.stop());
+        setCameraChecked(true);
+        // Keep scanMode as "qr" if camera is available
+      } catch (err: any) {
+        // Camera not available or permission denied
+        console.log("Camera not available:", err);
+        setCameraUnavailable(true);
+        setScanMode("manual");
+        setCameraChecked(true);
+      }
+    };
+
+    if (!cameraChecked) {
+      checkCamera();
+    }
+  }, [cameraChecked]);
 
   useEffect(() => {
     if (selectedItem) {
@@ -214,8 +249,20 @@ const BorrowFlow = () => {
         {/* Step: Scan/Select Item */}
         {currentStep === "scan" && (
           <div className="space-y-6">
-            {scanMode === "qr" ? (
+            {!cameraChecked ? (
+              <Card>
+                <CardContent className="pt-6 pb-6 text-center">
+                  <div className="animate-pulse space-y-2">
+                    <div className="h-8 w-8 mx-auto bg-muted rounded-full"></div>
+                    <p className="text-sm text-muted-foreground">
+                      Memeriksa kamera...
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : scanMode === "qr" ? (
               <QRScanner
+                key="qr-scanner"
                 onScanSuccess={handleQRScan}
                 onClose={() => navigate("/")}
                 onUnavailable={() => {
@@ -229,21 +276,22 @@ const BorrowFlow = () => {
                   <CardTitle>Masukkan Kode Barang</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {cameraUnavailable && (
-                    <Alert>
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>
-                        Kamera tidak tersedia atau akses ditolak. Silakan input
-                        kode barang secara manual.
-                      </AlertDescription>
-                    </Alert>
-                  )}
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      Kamera tidak tersedia atau akses ditolak. Silakan input
+                      kode barang secara manual.
+                    </AlertDescription>
+                  </Alert>
                   <div>
                     <Label htmlFor="manual-code">Kode Barang</Label>
                     <Input
                       id="manual-code"
                       placeholder="Contoh: BRG-001"
                       className="mt-1"
+                      onKeyPress={(e) =>
+                        e.key === "Enter" && handleManualCode()
+                      }
                     />
                     <p className="text-xs text-muted-foreground mt-1">
                       Lihat kode pada label barang
@@ -251,13 +299,6 @@ const BorrowFlow = () => {
                   </div>
                   <Button onClick={handleManualCode} className="w-full">
                     Cari Barang
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => setScanMode("qr")}
-                  >
-                    <QrCode className="h-4 w-4 mr-2" /> Coba Scan Lagi
                   </Button>
                 </CardContent>
               </Card>
