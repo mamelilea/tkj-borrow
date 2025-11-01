@@ -169,6 +169,28 @@ export const adminAPI = {
   },
 };
 
+// Upload API
+export const uploadAPI = {
+  // Upload image
+  uploadImage: async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const response = await fetch(`${API_BASE_URL}/upload/image`, {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Upload failed");
+    }
+
+    return data.data.url; // Return the URL
+  },
+};
+
 // Helper to check if backend is available
 export const checkBackendConnection = async (): Promise<boolean> => {
   try {

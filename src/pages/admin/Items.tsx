@@ -13,6 +13,17 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -38,7 +49,7 @@ import {
 } from "@/lib/qrUtils";
 import { toast } from "react-hot-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { barangAPI } from "@/lib/api";
+import { barangAPI, uploadAPI } from "@/lib/api";
 
 const Items = () => {
   const [items, setItems] = useState<Item[]>([]);
@@ -50,6 +61,9 @@ const Items = () => {
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
   const [currentQrCode, setCurrentQrCode] = useState("");
   const [loading, setLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<number | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const fetchItems = async () => {
@@ -82,12 +96,21 @@ const Items = () => {
     const newCode = generateItemCode(lastCode);
 
     try {
+      setUploading(true);
+
+      // Upload image if provided
+      let fotoUrl: string | undefined = undefined;
+      const fotoFile = (formData.get("foto") as File) || null;
+      if (fotoFile && fotoFile.size > 0) {
+        fotoUrl = await uploadAPI.uploadImage(fotoFile);
+      }
+
       const newItem = await barangAPI.create({
         kode_barang: newCode,
         nama_barang: formData.get("nama") as string,
         jumlah_stok: parseInt(formData.get("stok") as string),
         jumlah_dipinjam: 0,
-        foto_barang: (formData.get("foto") as string) || undefined,
+        foto_barang: fotoUrl,
         notes: (formData.get("notes") as string) || undefined,
       });
 
@@ -104,6 +127,8 @@ const Items = () => {
     } catch (error) {
       console.error("Error creating item:", error);
       toast.error("Gagal menambahkan barang");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -114,10 +139,19 @@ const Items = () => {
     const formData = new FormData(e.currentTarget);
 
     try {
+      setUploading(true);
+
+      // Upload new image if provided, otherwise keep existing
+      let fotoUrl: string | undefined = editingItem.foto_barang;
+      const fotoFile = (formData.get("foto") as File) || null;
+      if (fotoFile && fotoFile.size > 0) {
+        fotoUrl = await uploadAPI.uploadImage(fotoFile);
+      }
+
       await barangAPI.update(editingItem.id, {
         nama_barang: formData.get("nama") as string,
         jumlah_stok: parseInt(formData.get("stok") as string),
-        foto_barang: (formData.get("foto") as string) || undefined,
+        foto_barang: fotoUrl,
         notes: (formData.get("notes") as string) || undefined,
       });
 
@@ -130,19 +164,22 @@ const Items = () => {
     } catch (error) {
       console.error("Error updating item:", error);
       toast.error("Gagal mengupdate barang");
+    } finally {
+      setUploading(false);
     }
   };
 
-  const handleDeleteItem = async (id: number) => {
-    if (confirm("Apakah Anda yakin ingin menghapus barang ini?")) {
-      try {
-        await barangAPI.delete(id);
-        setItems(items.filter((item) => item.id !== id));
-        toast.success("Barang berhasil dihapus!");
-      } catch (error) {
-        console.error("Error deleting item:", error);
-        toast.error("Gagal menghapus barang");
-      }
+  const handleDeleteItem = async () => {
+    if (!itemToDelete) return;
+    try {
+      await barangAPI.delete(itemToDelete);
+      setItems(items.filter((item) => item.id !== itemToDelete));
+      setDeleteDialogOpen(false);
+      setItemToDelete(null);
+      toast.success("Barang berhasil dihapus!");
+    } catch (error) {
+      console.error("Error deleting item:", error);
+      toast.error("Gagal menghapus barang");
     }
   };
 
@@ -195,13 +232,16 @@ const Items = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="add-foto">URL Foto</Label>
+                  <Label htmlFor="add-foto">Foto Barang</Label>
                   <Input
                     id="add-foto"
                     name="foto"
-                    type="url"
-                    placeholder="https://example.com/image.jpg"
+                    type="file"
+                    accept="image/*"
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Format: JPG, PNG, GIF, WebP (maks 5MB)
+                  </p>
                 </div>
                 <div>
                   <Label htmlFor="add-notes">Catatan</Label>
@@ -217,8 +257,8 @@ const Items = () => {
                     ditambahkan
                   </AlertDescription>
                 </Alert>
-                <Button type="submit" className="w-full">
-                  Tambah Barang
+                <Button type="submit" className="w-full" disabled={uploading}>
+                  {uploading ? "Menyimpan..." : "Tambah Barang"}
                 </Button>
               </form>
             </DialogContent>
@@ -332,14 +372,47 @@ const Items = () => {
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => handleDeleteItem(item.id)}
+                            <AlertDialog
+                              open={
+                                deleteDialogOpen && itemToDelete === item.id
+                              }
+                              onOpenChange={(open) => {
+                                setDeleteDialogOpen(open);
+                                if (!open) setItemToDelete(null);
+                              }}
                             >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => setItemToDelete(item.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    Konfirmasi Hapus Barang
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Apakah Anda yakin ingin menghapus barang{" "}
+                                    <strong>{item.nama_barang}</strong>?
+                                    Tindakan ini tidak dapat dibatalkan.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Batal</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={handleDeleteItem}
+                                    className="bg-destructive hover:bg-destructive/90"
+                                  >
+                                    Hapus
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -387,13 +460,23 @@ const Items = () => {
                   </p>
                 </div>
                 <div>
-                  <Label htmlFor="edit-foto">URL Foto</Label>
+                  <Label htmlFor="edit-foto">Foto Barang</Label>
+                  {editingItem.foto_barang && (
+                    <img
+                      src={editingItem.foto_barang}
+                      alt="Current"
+                      className="w-24 h-24 object-cover rounded mb-2"
+                    />
+                  )}
                   <Input
                     id="edit-foto"
                     name="foto"
-                    type="url"
-                    defaultValue={editingItem.foto_barang}
+                    type="file"
+                    accept="image/*"
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Kosongkan jika tidak ingin mengubah foto
+                  </p>
                 </div>
                 <div>
                   <Label htmlFor="edit-notes">Catatan</Label>
@@ -412,8 +495,8 @@ const Items = () => {
                   >
                     Batal
                   </Button>
-                  <Button type="submit" className="flex-1">
-                    Simpan
+                  <Button type="submit" className="flex-1" disabled={uploading}>
+                    {uploading ? "Menyimpan..." : "Simpan"}
                   </Button>
                 </div>
               </form>

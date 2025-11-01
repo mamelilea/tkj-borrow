@@ -12,6 +12,7 @@ dotenv.config();
 const barangRoutes = require('./routes/barangRoutes');
 const peminjamanRoutes = require('./routes/peminjamanRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const uploadRoutes = require('./routes/uploadRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -37,6 +38,7 @@ app.get('/', (req, res) => {
 app.use('/api/barang', barangRoutes);
 app.use('/api/peminjaman', peminjamanRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
