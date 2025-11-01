@@ -92,7 +92,14 @@ const Items = () => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
 
-    const lastCode = items[items.length - 1]?.kode_barang;
+    // Find the highest code number
+    const codes = items
+      .map((item) => item.kode_barang.match(/BRG-(\d+)/)?.[1])
+      .filter(Boolean)
+      .map(Number);
+    const maxCode = codes.length > 0 ? Math.max(...codes) : 0;
+    const lastCode =
+      maxCode > 0 ? `BRG-${maxCode.toString().padStart(3, "0")}` : undefined;
     const newCode = generateItemCode(lastCode);
 
     try {
@@ -212,7 +219,7 @@ const Items = () => {
                 Tambah Barang
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Tambah Barang Baru</DialogTitle>
               </DialogHeader>
@@ -426,7 +433,7 @@ const Items = () => {
 
         {/* Edit Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="!max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Barang</DialogTitle>
             </DialogHeader>

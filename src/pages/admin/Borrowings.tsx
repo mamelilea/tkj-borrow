@@ -29,6 +29,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const Borrowings = () => {
   const [borrowings, setBorrowings] = useState<Borrowing[]>([]);
@@ -38,6 +49,9 @@ const Borrowings = () => {
     null
   );
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<number | null>(null);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -78,22 +92,154 @@ const Borrowings = () => {
     setDetailDialogOpen(true);
   };
 
-  const handleDelete = async (id: number) => {
-    if (confirm("Apakah Anda yakin ingin menghapus data peminjaman ini?")) {
-      try {
-        await peminjamanAPI.delete(id);
-        setBorrowings(borrowings.filter((b) => b.id !== id));
-        toast.success("Data peminjaman berhasil dihapus!");
-      } catch (error) {
-        console.error("Error deleting borrowing:", error);
-        toast.error("Gagal menghapus data peminjaman");
-      }
+  const handleDelete = async () => {
+    if (!itemToDelete) return;
+    try {
+      await peminjamanAPI.delete(itemToDelete);
+      setBorrowings(borrowings.filter((b) => b.id !== itemToDelete));
+      setDeleteDialogOpen(false);
+      setItemToDelete(null);
+      toast.success("Data peminjaman berhasil dihapus!");
+    } catch (error) {
+      console.error("Error deleting borrowing:", error);
+      toast.error("Gagal menghapus data peminjaman");
     }
   };
 
-  const handleExport = () => {
-    toast.success("Data sedang diexport...");
-    // In real app, this would export to PDF/Excel
+  const exportToCSV = () => {
+    const headers = [
+      "No",
+      "Kode Peminjaman",
+      "Tanggal Pinjam",
+      "Tanggal Kembali",
+      "Nama Peminjam",
+      "Kontak",
+      "Barang",
+      "Jumlah",
+      "Keperluan",
+      "Guru Pendamping",
+      "Status",
+    ];
+
+    const csvContent = [
+      headers.join(","),
+      ...filteredBorrowings.map((borrowing, index) =>
+        [
+          index + 1,
+          borrowing.kode_peminjaman,
+          new Date(borrowing.tanggal_pinjam).toLocaleDateString("id-ID"),
+          borrowing.tanggal_kembali
+            ? new Date(borrowing.tanggal_kembali).toLocaleDateString("id-ID")
+            : "-",
+          `"${borrowing.nama_peminjam}"`,
+          borrowing.kontak || "-",
+          `"${borrowing.nama_barang}"`,
+          borrowing.jumlah,
+          `"${borrowing.keperluan}"`,
+          `"${borrowing.guru_pendamping}"`,
+          borrowing.status,
+        ].join(",")
+      ),
+    ].join("\n");
+
+    const blob = new Blob(["\uFEFF" + csvContent], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `Data_Peminjaman_${
+      new Date().toISOString().split("T")[0]
+    }.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportToJSON = () => {
+    const jsonContent = JSON.stringify(filteredBorrowings, null, 2);
+    const blob = new Blob([jsonContent], { type: "application/json" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `Data_Peminjaman_${
+      new Date().toISOString().split("T")[0]
+    }.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportToExcel = () => {
+    // For Excel export, we'll use CSV with tab-separated values that Excel can open
+    const headers = [
+      "No",
+      "Kode Peminjaman",
+      "Tanggal Pinjam",
+      "Tanggal Kembali",
+      "Nama Peminjam",
+      "Kontak",
+      "Barang",
+      "Jumlah",
+      "Keperluan",
+      "Guru Pendamping",
+      "Status",
+    ];
+
+    const excelContent = [
+      headers.join("\t"),
+      ...filteredBorrowings.map((borrowing, index) =>
+        [
+          index + 1,
+          borrowing.kode_peminjaman,
+          new Date(borrowing.tanggal_pinjam).toLocaleDateString("id-ID"),
+          borrowing.tanggal_kembali
+            ? new Date(borrowing.tanggal_kembali).toLocaleDateString("id-ID")
+            : "-",
+          borrowing.nama_peminjam,
+          borrowing.kontak || "-",
+          borrowing.nama_barang,
+          borrowing.jumlah,
+          borrowing.keperluan,
+          borrowing.guru_pendamping,
+          borrowing.status,
+        ].join("\t")
+      ),
+    ].join("\n");
+
+    const blob = new Blob(["\uFEFF" + excelContent], {
+      type: "text/plain;charset=utf-8;",
+    });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `Data_Peminjaman_${
+      new Date().toISOString().split("T")[0]
+    }.xls`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExport = (format: "csv" | "json" | "excel") => {
+    try {
+      setExportDialogOpen(false);
+
+      switch (format) {
+        case "csv":
+          exportToCSV();
+          toast.success("Data berhasil diexport ke CSV!");
+          break;
+        case "json":
+          exportToJSON();
+          toast.success("Data berhasil diexport ke JSON!");
+          break;
+        case "excel":
+          exportToExcel();
+          toast.success("Data berhasil diexport ke Excel!");
+          break;
+      }
+    } catch (error) {
+      console.error("Error exporting data:", error);
+      toast.error("Gagal mengeksport data");
+    }
   };
 
   const stats = {
@@ -112,7 +258,11 @@ const Borrowings = () => {
               Lihat dan kelola semua transaksi peminjaman barang
             </p>
           </div>
-          <Button size="lg" onClick={handleExport} className="shadow-md">
+          <Button
+            size="lg"
+            onClick={() => setExportDialogOpen(true)}
+            className="shadow-md"
+          >
             <Download className="h-5 w-5 mr-2" />
             Export Data
           </Button>
@@ -294,15 +444,48 @@ const Borrowings = () => {
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          {/* Edit action removed as peminjaman is not editable */}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => handleDelete(borrowing.id)}
+                          <AlertDialog
+                            open={
+                              deleteDialogOpen && itemToDelete === borrowing.id
+                            }
+                            onOpenChange={(open) => {
+                              setDeleteDialogOpen(open);
+                              if (!open) setItemToDelete(null);
+                            }}
                           >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => setItemToDelete(borrowing.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  Konfirmasi Hapus Peminjaman
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Apakah Anda yakin ingin menghapus data
+                                  peminjaman{" "}
+                                  <strong>{borrowing.kode_peminjaman}</strong>?
+                                  Tindakan ini tidak dapat dibatalkan.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Batal</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={handleDelete}
+                                  className="bg-destructive hover:bg-destructive/90"
+                                >
+                                  Hapus
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -315,12 +498,12 @@ const Borrowings = () => {
 
         {/* Detail Dialog */}
         <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Detail Peminjaman</DialogTitle>
             </DialogHeader>
             {selectedBorrowing && (
-              <div className="space-y-4">
+              <div className="space-y-4 overflow-y-auto flex-1 pr-2">
                 <div className="bg-accent/50 p-4 rounded-lg">
                   <div className="text-center mb-2">
                     <code className="text-lg font-mono font-bold">
@@ -444,6 +627,54 @@ const Borrowings = () => {
                 </Button>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Export Dialog */}
+        <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Export Data Peminjaman</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-4">
+              <p className="text-sm text-muted-foreground">
+                Pilih format file untuk export data peminjaman
+              </p>
+              <div className="space-y-2">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => handleExport("csv")}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export ke CSV
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => handleExport("excel")}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export ke Excel
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => handleExport("json")}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export ke JSON
+                </Button>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setExportDialogOpen(false)}
+              >
+                Batal
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
