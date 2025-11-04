@@ -6,69 +6,69 @@
 
 @layer base {
   :root {
-    /* Base colors - Light mode default */
-    --background: 210 20% 98%;
-    --foreground: 215 25% 15%;
+    /* Base colors - switched to cream / light-brown palette */
+    --background: 35 60% 98%; /* very light cream */
+    --foreground: 30 18% 18%; /* dark brown text */
 
     --card: 0 0% 100%;
-    --card-foreground: 215 25% 15%;
+    --card-foreground: 30 18% 18%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 15%;
+    --popover-foreground: 30 18% 18%;
 
-    /* Primary - Professional Blue for education */
-    --primary: 217 91% 60%;
+    /* Primary - soft light brown */
+    --primary: 30 35% 50%; /* warm light brown */
     --primary-foreground: 0 0% 100%;
-    --primary-light: 217 91% 70%;
-    --primary-dark: 217 91% 50%;
+    --primary-light: 30 30% 62%;
+    --primary-dark: 30 35% 40%;
 
-    /* Secondary - Neutral Gray */
-    --secondary: 210 17% 95%;
-    --secondary-foreground: 215 25% 25%;
+    /* Secondary - soft cream */
+    --secondary: 38 50% 96%;
+    --secondary-foreground: 30 18% 30%;
 
-    /* Success - Green for positive actions */
+    /* Success - keep green */
     --success: 142 76% 36%;
     --success-foreground: 0 0% 100%;
     --success-light: 142 76% 46%;
 
-    /* Warning - Orange */
-    --warning: 38 92% 50%;
+    /* Warning - warm orange */
+    --warning: 30 90% 55%;
     --warning-foreground: 0 0% 100%;
 
-    --muted: 210 17% 95%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 35 40% 96%;
+    --muted-foreground: 30 12% 35%;
 
-    --accent: 217 91% 95%;
-    --accent-foreground: 217 91% 60%;
+    --accent: 35 40% 98%;
+    --accent-foreground: 30 35% 50%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 217 91% 60%;
+    --border: 30 18% 92%;
+    --input: 30 18% 92%;
+    --ring: 30 35% 50%;
 
     --radius: 0.75rem;
 
-    /* Custom design tokens */
-    --shadow-sm: 0 1px 2px 0 hsl(215 25% 15% / 0.05);
-    --shadow: 0 4px 6px -1px hsl(215 25% 15% / 0.1);
-    --shadow-lg: 0 10px 15px -3px hsl(215 25% 15% / 0.1);
-    --shadow-xl: 0 20px 25px -5px hsl(215 25% 15% / 0.1);
+    /* Custom design tokens (shadows use a subtle brown tint now) */
+    --shadow-sm: 0 1px 2px 0 hsl(30 12% 12% / 0.04);
+    --shadow: 0 4px 6px -1px hsl(30 12% 12% / 0.08);
+    --shadow-lg: 0 10px 15px -3px hsl(30 12% 12% / 0.09);
+    --shadow-xl: 0 20px 25px -5px hsl(30 12% 12% / 0.10);
 
     /* Transitions */
     --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
     --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
     --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
 
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 215 25% 25%;
-    --sidebar-primary: 217 91% 60%;
+    --sidebar-background: 35 60% 98%;
+    --sidebar-foreground: 30 18% 25%;
+    --sidebar-primary: 30 35% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 17% 95%;
-    --sidebar-accent-foreground: 215 25% 25%;
-    --sidebar-border: 214 32% 91%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-accent: 38 50% 96%;
+    --sidebar-accent-foreground: 30 18% 25%;
+    --sidebar-border: 30 18% 92%;
+    --sidebar-ring: 30 35% 50%;
   }
 }
 
@@ -79,6 +79,8 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+    /* Use Poppins as the main UI font */
+    font-family: 'Poppins', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 

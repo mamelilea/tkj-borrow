@@ -38,8 +38,11 @@ const Home = () => {
       item.kode_barang.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleBorrowItem = (item: Item) => {
-    navigate("/borrow", { state: { selectedItem: item } });
+  // Arahkan ke halaman peminjaman yang memulai dari langkah scan QR.
+  // Jangan mengirimkan `selectedItem` lewat state sehingga alur selalu
+  // dimulai dari scanner (user harus scan QR untuk memilih/konfirmasi barang).
+  const handleBorrowItem = (_item: Item) => {
+    navigate("/borrow");
   };
 
   return (
@@ -54,20 +57,29 @@ const Home = () => {
               dipinjam atau kembalikan barang yang sudah selesai digunakan.
             </p>
 
-            <div className="flex flex-wrap gap-3">
-              <Button size="lg" asChild className="shadow-md">
-                <Link to="/borrow">
-                  <Package className="h-5 w-5 mr-2" />
-                  Pinjam Barang
-                  <ArrowRight className="h-4 w-4 ml-2" />
+            <div className="flex flex-wrap gap-3 items-center">
+              <Button
+                size="xl"
+                asChild
+                className="shadow-md px-8 py-5 text-2xl md:text-2xl rounded-2xl font-semibold w-full md:w-auto transition-transform transform hover:scale-105"
+              >
+                <Link to="/borrow" className="flex items-center justify-center gap-3 w-full md:w-auto">
+                  <Package className="h-7 w-7" />
+                  <span>Pinjam Barang</span>
+                  <ArrowRight className="h-6 w-6" />
                 </Link>
               </Button>
 
-              <Button size="lg" variant="outline" asChild className="shadow-md">
-                <Link to="/return">
-                  <RotateCcw className="h-5 w-5 mr-2" />
-                  Kembalikan Barang
-                  <ArrowRight className="h-4 w-4 ml-2" />
+              <Button
+                size="xl"
+                variant="outline"
+                asChild
+                className="shadow-md px-8 py-5 text-2xl md:text-2xl rounded-2xl font-semibold w-full md:w-auto transition-transform transform hover:scale-105"
+              >
+                <Link to="/return" className="flex items-center justify-center gap-3 w-full md:w-auto">
+                  <RotateCcw className="h-7 w-7" />
+                  <span>Kembalikan Barang</span>
+                  <ArrowRight className="h-6 w-6" />
                 </Link>
               </Button>
             </div>
