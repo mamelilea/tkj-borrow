@@ -51,17 +51,17 @@ const Home = () => {
         {/* Hero Section */}
         <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent rounded-2xl p-8 border border-border shadow-custom">
           <div className="max-w-3xl">
-            <h2 className="text-3xl font-bold mb-3">Selamat Datang!</h2>
+            <h2 className="text-3xl font-bold mb-3 ">Selamat Datang!</h2>
             <p className="text-lg text-muted-foreground mb-6">
               Sistem peminjaman barang Unit TKJ. Pilih barang yang ingin
               dipinjam atau kembalikan barang yang sudah selesai digunakan.
             </p>
 
-            <div className="flex flex-wrap gap-3 items-center">
+            <div className="flex flex-wrap gap-6 items-center">
               <Button
-                size="xl"
+                size="lg"
                 asChild
-                className="shadow-md px-8 py-5 text-2xl md:text-2xl rounded-2xl font-semibold w-full md:w-auto transition-transform transform hover:scale-105"
+                className="shadow-md px-8 py-5 text-2xl md:text-2xl w-56 h-30 rounded-xl font-semibold md:w-auto transition-transform transform hover:scale-105"
               >
                 <Link to="/borrow" className="flex items-center justify-center gap-3 w-full md:w-auto">
                   <Package className="h-7 w-7" />
@@ -71,10 +71,10 @@ const Home = () => {
               </Button>
 
               <Button
-                size="xl"
+                size="lg"
                 variant="outline"
                 asChild
-                className="shadow-md px-8 py-5 text-2xl md:text-2xl rounded-2xl font-semibold w-full md:w-auto transition-transform transform hover:scale-105"
+                className="shadow-md px-8 py-5 text-2xl md:text-2xl rounded-xl h-30 font-semibold w-full md:w-auto transition-transform transform hover:scale-105"
               >
                 <Link to="/return" className="flex items-center justify-center gap-3 w-full md:w-auto">
                   <RotateCcw className="h-7 w-7" />

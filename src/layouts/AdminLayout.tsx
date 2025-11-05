@@ -48,7 +48,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                 className="text-destructive hover:text-destructive hover:bg-destructive/10"
                 onClick={() => {
                   clearAdminToken();
-                  navigate("/tkj-mgmt-2025/login", { replace: true });
+                  navigate("/admin-tkj/login", { replace: true });
                 }}
               >
                 <LogOut className="h-4 w-4 mr-2" />
@@ -62,33 +62,31 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       <div className="container mx-auto px-4 py-6">
         <nav className="flex gap-2 mb-6 bg-card p-2 rounded-lg border border-border shadow-sm">
           <Button
-            variant={isActive("/tkj-mgmt-2025/dashboard") ? "default" : "ghost"}
+            variant={isActive("/admin-tkj/dashboard") ? "default" : "ghost"}
             size="sm"
             asChild
           >
-            <Link to="/tkj-mgmt-2025/dashboard">
+            <Link to="/admin-tkj/dashboard">
               <Home className="h-4 w-4 mr-2" />
               Dashboard
             </Link>
           </Button>
           <Button
-            variant={isActive("/tkj-mgmt-2025/items") ? "default" : "ghost"}
+            variant={isActive("/admin-tkj/items") ? "default" : "ghost"}
             size="sm"
             asChild
           >
-            <Link to="/tkj-mgmt-2025/items">
+            <Link to="/admin-tkj/items">
               <Package className="h-4 w-4 mr-2" />
               Barang
             </Link>
           </Button>
           <Button
-            variant={
-              isActive("/tkj-mgmt-2025/borrowings") ? "default" : "ghost"
-            }
+            variant={isActive("/admin-tkj/borrowings") ? "default" : "ghost"}
             size="sm"
             asChild
           >
-            <Link to="/tkj-mgmt-2025/borrowings">
+            <Link to="/admin-tkj/borrowings">
               <ClipboardList className="h-4 w-4 mr-2" />
               Peminjaman
             </Link>

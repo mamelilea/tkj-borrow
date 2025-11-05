@@ -26,7 +26,7 @@ const AdminLogin = () => {
       const { token } = await adminAPI.login(username.trim(), password);
       setAdminToken(token);
       const redirectTo =
-        (location.state as any)?.from || "/tkj-mgmt-2025/dashboard";
+        (location.state as any)?.from || "/admin-tkj/dashboard";
       navigate(redirectTo, { replace: true });
     } catch (err: any) {
       setError(err?.message || "Login gagal");

@@ -30,6 +30,13 @@ const CameraCapture = ({
     };
   }, [stream]);
 
+  // Auto-start camera on mount. If camera isn't available or permission denied,
+  // fall back immediately to the signature pad (useSignature = true).
+  useEffect(() => {
+    startCamera();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const startCamera = async () => {
     try {
       setError("");
@@ -45,6 +52,7 @@ const CameraCapture = ({
         videoRef.current.srcObject = mediaStream;
         setStream(mediaStream);
         setIsStreaming(true);
+        setUseSignature(false);
       }
     } catch (err: any) {
       console.error("Error accessing camera:", err);
@@ -92,8 +100,8 @@ const CameraCapture = ({
   };
 
   return (
-    <Card className="p-6">
-      <div className="space-y-4">
+    <Card className="p-6 w-full max-w-5xl mx-auto">
+      <div className="space-y-4 w-full">
         <div className="flex items-center gap-2 mb-4">
           <Camera className="h-5 w-5 text-primary" />
           <h3 className="font-semibold text-lg">{label}</h3>
@@ -107,13 +115,13 @@ const CameraCapture = ({
         )}
 
         {!useSignature ? (
-          <div className="relative bg-muted rounded-lg overflow-hidden aspect-video">
+          <div className="relative bg-muted rounded-lg overflow-hidden w-full">
             {!isStreaming && !capturedImage && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center space-y-4">
                   <Camera className="h-16 w-16 text-muted-foreground mx-auto" />
                   <p className="text-sm text-muted-foreground">
-                    Klik tombol di bawah untuk membuka kamera
+                    Mencoba mengaktifkan kamera...
                   </p>
                 </div>
               </div>
@@ -123,14 +131,14 @@ const CameraCapture = ({
               <img
                 src={capturedImage}
                 alt="Captured"
-                className="w-full h-full object-cover"
+                className="w-full h-[60vh] md:h-[70vh] object-cover"
               />
             ) : (
               <video
                 ref={videoRef}
                 autoPlay
                 playsInline
-                className="w-full h-full object-cover"
+                className="w-full h-[60vh] md:h-[70vh] object-cover"
               />
             )}
 
@@ -147,29 +155,11 @@ const CameraCapture = ({
         )}
 
         <div className="space-y-2">
+          {/* While attempting to start camera (auto-start), show a small status.
+              If camera is unavailable we render SignaturePad above (useSignature=true).
+              When streaming, show capture button. */}
           {!useSignature && !isStreaming && !capturedImage && (
-            <Button onClick={startCamera} className="w-full">
-              <Camera className="h-4 w-4 mr-2" />
-              Buka Kamera
-            </Button>
-          )}
-
-          {!capturedImage && (
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                // Switch to signature mode; stop camera if active
-                if (stream) {
-                  stream.getTracks().forEach((track) => track.stop());
-                }
-                setIsStreaming(false);
-                setUseSignature(true);
-                setError("");
-              }}
-            >
-              Gunakan Tanda Tangan Digital
-            </Button>
+            <div className="text-center text-sm text-muted-foreground">Mencoba mengaktifkan kamera...</div>
           )}
 
           {isStreaming && !capturedImage && (

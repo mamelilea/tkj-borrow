@@ -115,8 +115,8 @@ const SignaturePad = ({
   };
 
   return (
-    <Card className="p-6">
-      <div className="space-y-4">
+    <Card className="p-6 w-full max-w-5xl mx-auto">
+      <div className="space-y-4 w-full">
         <div className="flex items-center gap-2 mb-2">
           <Pencil className="h-5 w-5 text-primary" />
           <h3 className="font-semibold text-lg">{label}</h3>

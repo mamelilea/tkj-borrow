@@ -16,7 +16,7 @@ const RequireAuth = ({ children }: { children: JSX.Element }) => {
         await adminAPI.getProfile(token);
         setChecking(false);
       } catch {
-        navigate("/tkj-mgmt-2025/login", {
+        navigate("/admin-tkj/login", {
           replace: true,
           state: { from: location.pathname },
         });

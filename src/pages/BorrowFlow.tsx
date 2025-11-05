@@ -96,7 +96,7 @@ const BorrowFlow = () => {
           setSelectedItem(item);
           setFormData((prev) => ({ ...prev, id_barang: item.id }));
           setCurrentStep("form");
-          toast.success(`Barang ditemukan: ${item.nama_barang}`);
+          // toast.success(`Barang ditemukan: ${item.nama_barang}`);
         } else {
           toast.error("Maaf, barang tidak tersedia saat ini");
         }
@@ -386,18 +386,20 @@ const BorrowFlow = () => {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="guru">Guru Pendamping *</Label>
-                    <Input
+                    <select
                       id="guru"
                       value={formData.guru_pendamping}
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          guru_pendamping: e.target.value,
-                        })
+                        setFormData({ ...formData, guru_pendamping: e.target.value })
                       }
-                      placeholder="Contoh: Pak Budi"
+                      className="mt-1 w-full rounded-md border px-3 py-2 bg-background"
                       required
-                    />
+                    >
+                      <option value="">Pilih Guru</option>
+                      <option value="Guru A">Pak Andi Bayu, S.Pd.</option>
+                      <option value="Guru B">Bu Ira Rosmalina, M.Pd.</option>
+                      <option value="Guru C">Guru C</option>
+                    </select>
                   </div>
                   <div>
                     <Label htmlFor="jumlah">Jumlah Barang *</Label>

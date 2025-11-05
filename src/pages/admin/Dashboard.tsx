@@ -140,7 +140,7 @@ const Dashboard = () => {
                 untuk setiap barang.
               </p>
               <Button asChild size="lg" className="shadow-md">
-                <Link to="/tkj-mgmt-2025/items">
+                <Link to="/admin-tkj/items">
                   Ke Halaman Barang
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Link>
@@ -148,8 +148,8 @@ const Dashboard = () => {
             </div>
           </Card>
 
-          <Card className="overflow-hidden">
-            <div className="bg-gradient-to-br from-success/10 to-success/5 p-6">
+          <Card className="overflow-hidden bg-gradient-to-br from-success/10 to-success/5">
+            <div className=" p-6">
               <ClipboardList className="h-12 w-12 text-success mb-4" />
               <CardTitle className="text-2xl mb-2">Kelola Peminjaman</CardTitle>
               <p className="text-muted-foreground mb-4">
@@ -157,7 +157,7 @@ const Dashboard = () => {
                 laporan.
               </p>
               <Button asChild size="lg" className="shadow-md">
-                <Link to="/tkj-mgmt-2025/borrowings">
+                <Link to="/admin-tkj/borrowings">
                   Ke Halaman Peminjaman
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Link>
@@ -172,7 +172,7 @@ const Dashboard = () => {
             <div className="flex items-center justify-between">
               <CardTitle>Peminjaman Terbaru</CardTitle>
               <Button variant="ghost" size="sm" asChild>
-                <Link to="/tkj-mgmt-2025/borrowings">
+                <Link to="/admin-tkj/borrowings">
                   Lihat Semua
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Link>

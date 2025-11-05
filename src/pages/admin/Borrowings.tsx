@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import AdminLayout from "@/layouts/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Search, Download, Eye, Trash2, Calendar } from "lucide-react";
+import { Search, Download, Eye, Trash2, Calendar, ChevronsUpDown } from "lucide-react";
 import { Borrowing } from "@/types";
 import { toast } from "react-hot-toast";
 import { peminjamanAPI } from "@/lib/api";
@@ -53,6 +55,8 @@ const Borrowings = () => {
   const [itemToDelete, setItemToDelete] = useState<number | null>(null);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [sortBy, setSortBy] = useState<string>("tanggal_pinjam");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   useEffect(() => {
     const fetchBorrowings = async () => {
@@ -72,20 +76,76 @@ const Borrowings = () => {
   }, []);
 
   const filteredBorrowings = borrowings.filter((borrowing) => {
-    const matchesSearch =
-      borrowing.kode_peminjaman
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
-      borrowing.nama_peminjam
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
-      borrowing.nama_barang?.toLowerCase().includes(searchQuery.toLowerCase());
+    const q = searchQuery.toLowerCase().trim();
 
-    const matchesStatus =
-      statusFilter === "all" || borrowing.status === statusFilter;
+    // collect searchable fields and normalize to lowercase strings
+    const fields: string[] = [
+      borrowing.kode_peminjaman || "",
+      borrowing.nama_peminjam || "",
+      borrowing.nama_barang || "",
+      borrowing.kontak || "",
+      borrowing.keperluan || "",
+      borrowing.guru_pendamping || "",
+      borrowing.status || "",
+      borrowing.tanggal_pinjam
+        ? new Date(borrowing.tanggal_pinjam).toLocaleString("id-ID")
+        : "",
+      borrowing.tanggal_kembali
+        ? new Date(borrowing.tanggal_kembali).toLocaleString("id-ID")
+        : "",
+    ].map((s) => String(s).toLowerCase());
+
+    const matchesSearch = q === "" || fields.some((f) => f.includes(q));
+
+    const matchesStatus = statusFilter === "all" || borrowing.status === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
+
+  // Sort the filtered list client-side. Clicking a header toggles asc/desc.
+  const sortedBorrowings = [...filteredBorrowings].sort((a, b) => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    const getVal = (obj: any, key: string) => {
+      switch (key) {
+        case "kode_peminjaman":
+          return obj.kode_peminjaman || "";
+        case "tanggal_pinjam":
+          return obj.tanggal_pinjam ? new Date(obj.tanggal_pinjam).getTime() : 0;
+        case "tanggal_kembali":
+          return obj.tanggal_kembali ? new Date(obj.tanggal_kembali).getTime() : 0;
+        case "nama_peminjam":
+          return obj.nama_peminjam || "";
+        case "nama_barang":
+          return obj.nama_barang || "";
+        case "jumlah":
+          return Number(obj.jumlah) || 0;
+        case "status":
+          return obj.status || "";
+        case "guru_pendamping":
+          return obj.guru_pendamping || "";
+        default:
+          return obj[key] || "";
+      }
+    };
+
+    const va = getVal(a, sortBy);
+    const vb = getVal(b, sortBy);
+
+    if (typeof va === "number" && typeof vb === "number") {
+      return (va - vb) * dir;
+    }
+
+    return String(va).toLowerCase().localeCompare(String(vb).toLowerCase()) * dir;
+  });
+
+  const handleSort = (key: string) => {
+    if (sortBy === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(key);
+      setSortDir("asc");
+    }
+  };
 
   const handleViewDetail = (borrowing: Borrowing) => {
     setSelectedBorrowing(borrowing);
@@ -120,10 +180,9 @@ const Borrowings = () => {
       "Guru Pendamping",
       "Status",
     ];
-
     const csvContent = [
       headers.join(","),
-      ...filteredBorrowings.map((borrowing, index) =>
+      ...sortedBorrowings.map((borrowing, index) =>
         [
           index + 1,
           borrowing.kode_peminjaman,
@@ -147,100 +206,89 @@ const Borrowings = () => {
     });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `Data_Peminjaman_${
-      new Date().toISOString().split("T")[0]
-    }.csv`;
+    link.download = `Data_Peminjaman_${new Date().toISOString().split("T")[0]
+      }.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const exportToJSON = () => {
-    const jsonContent = JSON.stringify(filteredBorrowings, null, 2);
-    const blob = new Blob([jsonContent], { type: "application/json" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `Data_Peminjaman_${
-      new Date().toISOString().split("T")[0]
-    }.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  const exportToPDF = () => {
+    const doc = new jsPDF({ orientation: "landscape" });
 
-  const exportToExcel = () => {
-    // For Excel export, we'll use CSV with tab-separated values that Excel can open
-    const headers = [
+    doc.setFontSize(14);
+    doc.text("Data Peminjaman Barang", 14, 15);
+
+    const tableColumn = [
       "No",
       "Kode Peminjaman",
-      "Tanggal Pinjam",
-      "Tanggal Kembali",
       "Nama Peminjam",
       "Kontak",
       "Barang",
       "Jumlah",
       "Keperluan",
       "Guru Pendamping",
+      "Tanggal Pinjam",
+      "Tanggal Kembali",
       "Status",
     ];
 
-    const excelContent = [
-      headers.join("\t"),
-      ...filteredBorrowings.map((borrowing, index) =>
-        [
-          index + 1,
-          borrowing.kode_peminjaman,
-          new Date(borrowing.tanggal_pinjam).toLocaleDateString("id-ID"),
-          borrowing.tanggal_kembali
-            ? new Date(borrowing.tanggal_kembali).toLocaleDateString("id-ID")
-            : "-",
-          borrowing.nama_peminjam,
-          borrowing.kontak || "-",
-          borrowing.nama_barang,
-          borrowing.jumlah,
-          borrowing.keperluan,
-          borrowing.guru_pendamping,
-          borrowing.status,
-        ].join("\t")
-      ),
-    ].join("\n");
+    const tableRows = sortedBorrowings.map((b, i) => [
+      i + 1,
+      b.kode_peminjaman,
+      b.nama_peminjam,
+      b.kontak || "-",
+      b.nama_barang,
+      b.jumlah,
+      b.keperluan || "-",
+      b.guru_pendamping || "-",
+      new Date(b.tanggal_pinjam).toLocaleDateString("id-ID"),
+      b.tanggal_kembali
+        ? new Date(b.tanggal_kembali).toLocaleDateString("id-ID")
+        : "-",
+      b.status,
+    ]);
 
-    const blob = new Blob(["\uFEFF" + excelContent], {
-      type: "text/plain;charset=utf-8;",
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 25,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [78, 52, 46] }, // warna coklat tua (#4e342e)
+      theme: "grid",
     });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `Data_Peminjaman_${
-      new Date().toISOString().split("T")[0]
-    }.xls`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+
+    doc.save(`Data_Peminjaman_${new Date().toISOString().split("T")[0]}.pdf`);
+    toast.success("Data berhasil diexport ke PDF!");
   };
 
-  const handleExport = (format: "csv" | "json" | "excel") => {
-    try {
-      setExportDialogOpen(false);
+  // helper to escape HTML in table cells
+  function escapeHtml(str: string) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
 
-      switch (format) {
-        case "csv":
-          exportToCSV();
-          toast.success("Data berhasil diexport ke CSV!");
-          break;
-        case "json":
-          exportToJSON();
-          toast.success("Data berhasil diexport ke JSON!");
-          break;
-        case "excel":
-          exportToExcel();
-          toast.success("Data berhasil diexport ke Excel!");
-          break;
+  const handleExport = (format: "csv" | "pdf") => {
+    try {
+      if (format === "pdf") {
+        setExportDialogOpen(false);
+        exportToPDF();
+        return;
       }
+
+      setExportDialogOpen(false);
+      exportToCSV();
     } catch (error) {
       console.error("Error exporting data:", error);
       toast.error("Gagal mengeksport data");
     }
   };
+
+  console.log("📄 Mulai export PDF...", sortedBorrowings.length);
 
   const stats = {
     total: borrowings.length,
@@ -313,7 +361,7 @@ const Borrowings = () => {
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Cari kode, nama peminjam, atau barang..."
+                  placeholder="Cari apapun..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -346,17 +394,122 @@ const Borrowings = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>No</TableHead>
-                    <TableHead>Kode</TableHead>
-                    <TableHead>Tanggal</TableHead>
-                    <TableHead>Peminjam</TableHead>
-                    <TableHead>Barang</TableHead>
-                    <TableHead>Jumlah</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>
+                      <button
+                        type="button"
+                        className="flex items-center gap-2"
+                        onClick={() => handleSort("kode_peminjaman")}
+                      >
+                        Kode
+                        <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
+                        {sortBy === "kode_peminjaman" && (
+                          <span className="text-xs">{sortDir === "asc" ? "▲" : "▼"}</span>
+                        )}
+                      </button>
+                    </TableHead>
+
+                    <TableHead>
+                      <button
+                        type="button"
+                        className="flex items-center gap-2"
+                        onClick={() => handleSort("tanggal_pinjam")}
+                      >
+                        Tanggal
+                        <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
+                        {sortBy === "tanggal_pinjam" && (
+                          <span className="text-xs">{sortDir === "asc" ? "▲" : "▼"}</span>
+                        )}
+                      </button>
+                    </TableHead>
+
+                    <TableHead>
+                      <button
+                        type="button"
+                        className="flex items-center gap-2"
+                        onClick={() => handleSort("tanggal_kembali")}
+                      >
+                        Tgl Kembali
+                        <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
+                        {sortBy === "tanggal_kembali" && (
+                          <span className="text-xs">{sortDir === "asc" ? "▲" : "▼"}</span>
+                        )}
+                      </button>
+                    </TableHead>
+
+                    <TableHead>
+                      <button
+                        type="button"
+                        className="flex items-center gap-2"
+                        onClick={() => handleSort("nama_peminjam")}
+                      >
+                        Peminjam
+                        <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
+                        {sortBy === "nama_peminjam" && (
+                          <span className="text-xs">{sortDir === "asc" ? "▲" : "▼"}</span>
+                        )}
+                      </button>
+                    </TableHead>
+
+                    <TableHead>
+                      <button
+                        type="button"
+                        className="flex items-center gap-2"
+                        onClick={() => handleSort("guru_pendamping")}
+                      >
+                        Guru
+                        <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
+                        {sortBy === "guru_pendamping" && (
+                          <span className="text-xs">{sortDir === "asc" ? "▲" : "▼"}</span>
+                        )}
+                      </button>
+                    </TableHead>
+
+                    <TableHead>
+                      <button
+                        type="button"
+                        className="flex items-center gap-2"
+                        onClick={() => handleSort("nama_barang")}
+                      >
+                        Barang
+                        <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
+                        {sortBy === "nama_barang" && (
+                          <span className="text-xs">{sortDir === "asc" ? "▲" : "▼"}</span>
+                        )}
+                      </button>
+                    </TableHead>
+
+                    <TableHead>
+                      <button
+                        type="button"
+                        className="flex items-center gap-2"
+                        onClick={() => handleSort("jumlah")}
+                      >
+                        Jumlah
+                        <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
+                        {sortBy === "jumlah" && (
+                          <span className="text-xs">{sortDir === "asc" ? "▲" : "▼"}</span>
+                        )}
+                      </button>
+                    </TableHead>
+
+                    <TableHead>
+                      <button
+                        type="button"
+                        className="flex items-center gap-2"
+                        onClick={() => handleSort("status")}
+                      >
+                        Status
+                        <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
+                        {sortBy === "status" && (
+                          <span className="text-xs">{sortDir === "asc" ? "▲" : "▼"}</span>
+                        )}
+                      </button>
+                    </TableHead>
                     <TableHead className="text-right">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredBorrowings.map((borrowing, index) => (
+                  {sortedBorrowings.map((borrowing, index) => (
                     <TableRow key={borrowing.id}>
                       <TableCell>{index + 1}</TableCell>
                       <TableCell>
@@ -364,6 +517,7 @@ const Borrowings = () => {
                           {borrowing.kode_peminjaman}
                         </code>
                       </TableCell>
+
                       <TableCell>
                         <div className="text-sm">
                           <div className="flex items-center gap-1">
@@ -376,19 +530,25 @@ const Borrowings = () => {
                               year: "numeric",
                             })}
                           </div>
-                          {borrowing.tanggal_kembali && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              Kembali:{" "}
-                              {new Date(
-                                borrowing.tanggal_kembali
-                              ).toLocaleDateString("id-ID", {
-                                day: "2-digit",
-                                month: "short",
-                              })}
-                            </div>
-                          )}
                         </div>
                       </TableCell>
+
+                      <TableCell>
+                        {borrowing.tanggal_kembali ? (
+                          <div className="text-sm">
+                            {new Date(
+                              borrowing.tanggal_kembali
+                            ).toLocaleDateString("id-ID", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-muted-foreground">-</div>
+                        )}
+                      </TableCell>
+
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {borrowing.foto_credential && (
@@ -408,6 +568,9 @@ const Borrowings = () => {
                           </div>
                         </div>
                       </TableCell>
+
+                      <TableCell className="text-sm">{borrowing.guru_pendamping || "-"}</TableCell>
+
                       <TableCell>
                         <div className="font-medium">
                           {borrowing.nama_barang}
@@ -416,9 +579,9 @@ const Borrowings = () => {
                           {borrowing.keperluan}
                         </div>
                       </TableCell>
-                      <TableCell className="font-medium">
-                        {borrowing.jumlah}x
-                      </TableCell>
+
+                      <TableCell className="font-medium">{borrowing.jumlah}x</TableCell>
+
                       <TableCell>
                         <Badge
                           variant={
@@ -435,6 +598,7 @@ const Borrowings = () => {
                           {borrowing.status}
                         </Badge>
                       </TableCell>
+
                       <TableCell className="text-right">
                         <div className="flex gap-1 justify-end">
                           <Button
@@ -652,18 +816,10 @@ const Borrowings = () => {
                 <Button
                   variant="outline"
                   className="w-full justify-start"
-                  onClick={() => handleExport("excel")}
+                  onClick={() => handleExport("pdf")}
                 >
                   <Download className="h-4 w-4 mr-2" />
-                  Export ke Excel
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start"
-                  onClick={() => handleExport("json")}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Export ke JSON
+                  Export ke PDF
                 </Button>
               </div>
             </div>

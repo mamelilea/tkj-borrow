@@ -42,11 +42,7 @@ import {
   Package,
 } from "lucide-react";
 import { Item } from "@/types";
-import {
-  generateQRCode,
-  downloadQRCode,
-  generateItemCode,
-} from "@/lib/qrUtils";
+import { generateQRCode, downloadQRCode } from "@/lib/qrUtils";
 import { toast } from "react-hot-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { barangAPI, uploadAPI } from "@/lib/api";
@@ -92,15 +88,50 @@ const Items = () => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
 
-    // Find the highest code number
-    const codes = items
-      .map((item) => item.kode_barang.match(/BRG-(\d+)/)?.[1])
-      .filter(Boolean)
-      .map(Number);
-    const maxCode = codes.length > 0 ? Math.max(...codes) : 0;
-    const lastCode =
-      maxCode > 0 ? `BRG-${maxCode.toString().padStart(3, "0")}` : undefined;
-    const newCode = generateItemCode(lastCode);
+    // Generate kode_barang in format TKJ-XXXX where XXXX is a 4-char
+    // abbreviation derived from the item name. Ensure uniqueness by
+    // appending a numeric suffix if needed.
+    const name = String(formData.get("nama") || "").trim();
+
+    const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+
+    const makeAbbrev = (raw: string) => {
+      if (!raw) return "XXXX";
+      const words = raw
+        .split(/[^a-zA-Z0-9]+/)
+        .map((w) => w.trim())
+        .filter(Boolean);
+
+      let abbrev = "";
+      // take first letters of up to 4 words
+      if (words.length > 0) {
+        for (let i = 0; i < Math.min(4, words.length); i++) {
+          abbrev += words[i][0] || "";
+        }
+      }
+
+      // if still less than 4 chars, append letters from the sanitized name
+      const pool = sanitize(raw);
+      let idx = 0;
+      while (abbrev.length < 4 && idx < pool.length) {
+        const ch = pool[idx];
+        if (!abbrev.includes(ch)) abbrev += ch;
+        idx++;
+      }
+
+      // ensure exactly 4 chars
+      abbrev = (abbrev + "XXXX").slice(0, 4);
+      return abbrev;
+    };
+
+    const base = makeAbbrev(name);
+    const existing = new Set(items.map((it) => it.kode_barang));
+    let newCode = `TKJ-${base}`;
+    let suffix = 1;
+    while (existing.has(newCode)) {
+      newCode = `TKJ-${base}-${suffix}`;
+      suffix++;
+    }
 
     try {
       setUploading(true);

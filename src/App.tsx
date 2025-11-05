@@ -2,7 +2,7 @@ import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { Toaster as HotToaster } from "react-hot-toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Home from "./pages/Home";
 import BorrowFlow from "./pages/BorrowFlow";
 import ReturnFlow from "./pages/ReturnFlow";
@@ -38,11 +38,17 @@ const App = () => (
           <Route path="/return" element={<ReturnFlow />} />
 
           {/* Admin Login */}
-          <Route path="/tkj-mgmt-2025/login" element={<AdminLogin />} />
+          <Route path="/admin-tkj/login" element={<AdminLogin />} />
+
+          {/* Redirect base admin path to dashboard */}
+          <Route
+            path="/admin-tkj"
+            element={<Navigate to="/admin-tkj/dashboard" replace />}
+          />
 
           {/* Admin Routes - protected */}
           <Route
-            path="/tkj-mgmt-2025/dashboard"
+            path="/admin-tkj/dashboard"
             element={
               <RequireAuth>
                 <Dashboard />
@@ -50,7 +56,7 @@ const App = () => (
             }
           />
           <Route
-            path="/tkj-mgmt-2025/items"
+            path="/admin-tkj/items"
             element={
               <RequireAuth>
                 <Items />
@@ -58,7 +64,7 @@ const App = () => (
             }
           />
           <Route
-            path="/tkj-mgmt-2025/borrowings"
+            path="/admin-tkj/borrowings"
             element={
               <RequireAuth>
                 <Borrowings />

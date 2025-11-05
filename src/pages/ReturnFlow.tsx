@@ -12,7 +12,7 @@ import { toast } from "react-hot-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { peminjamanAPI } from "@/lib/api";
 
-type Step = "search" | "verify" | "complete";
+type Step = "search" | "verify" | "photo" | "complete";
 
 const ReturnFlow = () => {
   const navigate = useNavigate();
@@ -75,7 +75,7 @@ const ReturnFlow = () => {
 
   return (
     <PublicLayout>
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-3xl mx-auto">
         <Button variant="ghost" onClick={() => navigate("/")} className="mb-6">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Kembali ke Beranda
@@ -194,24 +194,61 @@ const ReturnFlow = () => {
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                Ambil foto untuk verifikasi pengembalian. Pastikan wajah dan
-                barang terlihat jelas.
+                Selanjutnya: ambil foto untuk verifikasi pengembalian pada
+                halaman berikutnya. Pastikan wajah dan barang terlihat jelas.
               </AlertDescription>
             </Alert>
 
-            <CameraCapture
-              onCapture={handlePhotoVerification}
-              label="Foto Verifikasi Pengembalian"
-            />
+            <div className="grid grid-cols-1 gap-3">
+              <Button
+                onClick={() => setCurrentStep("photo")}
+                className="w-full"
+                size="lg"
+              >
+                Lanjutkan ke Foto Verifikasi
+              </Button>
 
-            <Button
-              variant="outline"
-              onClick={() => setCurrentStep("search")}
-              className="w-full"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Kembali
-            </Button>
+              <Button
+                variant="outline"
+                onClick={() => setCurrentStep("search")}
+                className="w-full"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Kembali
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step: Photo */}
+        {currentStep === "photo" && foundBorrowing && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Foto Verifikasi Pengembalian</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Ambil foto peminjam dan barang untuk verifikasi. Jika kamera
+                  tidak tersedia, Anda akan langsung diminta untuk tanda tangan
+                  digital.
+                </p>
+
+                <CameraCapture
+                  onCapture={handlePhotoVerification}
+                  label="Foto Verifikasi Pengembalian"
+                />
+
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentStep("verify")}
+                  className="w-full mt-2"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Kembali
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         )}
 
