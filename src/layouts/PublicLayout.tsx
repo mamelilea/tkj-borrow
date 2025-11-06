@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { Link } from "react-router-dom";
 
 interface PublicLayoutProps {
   children: ReactNode;
@@ -10,7 +11,7 @@ const PublicLayout = ({ children }: PublicLayoutProps) => {
       <header className="bg-card border-b border-border shadow-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <Link to="/admin-tkj" className="flex items-center gap-3 hover:opacity-90" title="Masuk ke Admin">
               <img
                 src="/favicon-32x32.png"
                 alt="Logo"
@@ -22,7 +23,7 @@ const PublicLayout = ({ children }: PublicLayoutProps) => {
                 </h1>
                 <p className="text-sm text-muted-foreground">Unit TKJ</p>
               </div>
-            </div>
+            </Link>
           </div>
         </div>
       </header>

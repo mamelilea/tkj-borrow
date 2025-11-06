@@ -47,6 +47,12 @@ const Borrowings = () => {
   const [borrowings, setBorrowings] = useState<Borrowing[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [periodFilter, setPeriodFilter] = useState<string>("all");
+  const [periodDetailDate, setPeriodDetailDate] = useState<string>("" );
+  const [periodDetailMonth, setPeriodDetailMonth] = useState<string>(""); // yyyy-mm
+  const [periodDetailWeekMonth, setPeriodDetailWeekMonth] = useState<string>(""); // yyyy-mm for week-in-month
+  const [periodDetailWeekNumber, setPeriodDetailWeekNumber] = useState<number>(1);
+  const [periodDetailYear, setPeriodDetailYear] = useState<number>(new Date().getFullYear());
   const [selectedBorrowing, setSelectedBorrowing] = useState<Borrowing | null>(
     null
   );
@@ -99,7 +105,54 @@ const Borrowings = () => {
 
     const matchesStatus = statusFilter === "all" || borrowing.status === statusFilter;
 
-    return matchesSearch && matchesStatus;
+    // Period filter: hari/minggu/bulan/tahun applied to tanggal_pinjam with detail inputs
+    const isInPeriod = (dateStr?: string | null, period?: string) => {
+      if (!dateStr) return false;
+      if (!period || period === "all") return true;
+      const d = new Date(dateStr);
+      const now = new Date();
+
+      const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+      if (period === "day") {
+        if (!periodDetailDate) return true; // no detail selected => include all
+        const sel = new Date(periodDetailDate);
+        return sameDay(d, sel);
+      }
+
+      if (period === "week") {
+        if (!periodDetailWeekMonth) return true;
+        // week-in-month: week 1 = days 1-7, week 2 = 8-14, etc.
+        const [yStr, mStr] = periodDetailWeekMonth.split("-");
+        const year = Number(yStr);
+        const month = Number(mStr) - 1; // 0-based
+        const wk = Number(periodDetailWeekNumber) || 1;
+        const start = new Date(year, month, (wk - 1) * 7 + 1);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(year, month, wk * 7 + 1);
+        end.setHours(0, 0, 0, 0);
+        return d >= start && d < end;
+      }
+
+      if (period === "month") {
+        if (!periodDetailMonth) return true;
+        const [yStr, mStr] = periodDetailMonth.split("-");
+        const year = Number(yStr);
+        const month = Number(mStr) - 1;
+        return d.getFullYear() === year && d.getMonth() === month;
+      }
+
+      if (period === "year") {
+        if (!periodDetailYear) return true;
+        return d.getFullYear() === Number(periodDetailYear);
+      }
+
+      return true;
+    };
+
+    const matchesPeriod = periodFilter === "all" || isInPeriod(borrowing.tanggal_pinjam, periodFilter);
+
+    return matchesSearch && matchesStatus && matchesPeriod;
   });
 
   // Sort the filtered list client-side. Clicking a header toggles asc/desc.
@@ -367,16 +420,108 @@ const Borrowings = () => {
                   className="pl-10"
                 />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full md:w-[200px]">
-                  <SelectValue placeholder="Filter Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Status</SelectItem>
-                  <SelectItem value="Dipinjam">Dipinjam</SelectItem>
-                  <SelectItem value="Dikembalikan">Dikembalikan</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2 w-full md:w-auto">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full md:w-[200px]">
+                    <SelectValue placeholder="Filter Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Status</SelectItem>
+                    <SelectItem value="Dipinjam">Dipinjam</SelectItem>
+                    <SelectItem value="Dikembalikan">Dikembalikan</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {/* Period selector under search with inline detail control */}
+            <div className="mt-3 flex flex-col md:flex-row items-start gap-3">
+              <div className="w-full md:w-1/4">
+                <label className="text-xs text-muted-foreground">Filter Periode</label>
+                <Select value={periodFilter} onValueChange={setPeriodFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Pilih Periode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Periode</SelectItem>
+                    <SelectItem value="day">Hari</SelectItem>
+                    <SelectItem value="week">Minggu (ke dalam bulan)</SelectItem>
+                    <SelectItem value="month">Bulan</SelectItem>
+                    <SelectItem value="year">Tahun</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex-1 flex gap-3">
+                {periodFilter === "day" && (
+                  <div className="w-full md:w-1/3">
+                    <label className="text-xs text-muted-foreground">Pilih Tanggal</label>
+                    <input
+                      type="date"
+                      className="w-full mt-1 input"
+                      value={periodDetailDate}
+                      onChange={(e) => setPeriodDetailDate(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                {periodFilter === "week" && (
+                  <>
+                    <div className="w-full md:w-1/3">
+                      <label className="text-xs text-muted-foreground">Pilih Bulan</label>
+                      <input
+                        type="month"
+                        className="w-full mt-1 input"
+                        value={periodDetailWeekMonth}
+                        onChange={(e) => setPeriodDetailWeekMonth(e.target.value)}
+                      />
+                    </div>
+                    <div className="w-28">
+                      <label className="text-xs text-muted-foreground">Minggu ke</label>
+                      <Select
+                        value={String(periodDetailWeekNumber)}
+                        onValueChange={(v) => setPeriodDetailWeekNumber(Number(v))}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">1</SelectItem>
+                          <SelectItem value="2">2</SelectItem>
+                          <SelectItem value="3">3</SelectItem>
+                          <SelectItem value="4">4</SelectItem>
+                          <SelectItem value="5">5</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+
+                {periodFilter === "month" && (
+                  <div className="w-full md:w-1/3">
+                    <label className="text-xs text-muted-foreground">Pilih Bulan</label>
+                    <input
+                      type="month"
+                      className="w-full mt-1 input"
+                      value={periodDetailMonth}
+                      onChange={(e) => setPeriodDetailMonth(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                {periodFilter === "year" && (
+                  <div className="w-44">
+                    <label className="text-xs text-muted-foreground">Pilih Tahun</label>
+                    <input
+                      type="number"
+                      min="2000"
+                      max="2100"
+                      className="w-full mt-1 input"
+                      value={periodDetailYear}
+                      onChange={(e) => setPeriodDetailYear(Number(e.target.value))}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
